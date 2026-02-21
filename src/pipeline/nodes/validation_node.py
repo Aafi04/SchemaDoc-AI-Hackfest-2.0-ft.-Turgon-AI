@@ -21,28 +21,25 @@ def validate_schema_node(state: AgentState) -> Dict[str, Any]:
     
     logger.info(f"Validating schema integrity (Attempt {current_retries + 1}/{AppConfig.MAX_RETRIES})...")
 
-    # 1. Check Table Counts
+    # Check Table Counts
     if len(raw) != len(enriched):
         errors.append(f"CRITICAL: Table count mismatch. Raw has {len(raw)}, AI returned {len(enriched)}.")
 
-    # 2. Deep Column Verification
+    # Deep Column Verification
     for table_name, raw_table_data in raw.items():
-        # A. Check Table Existence
         if table_name not in enriched:
             errors.append(f"Missing Table: '{table_name}' was dropped by AI.")
             continue
         
-        # B. Check Column Sets
-        # We compare the keys of the 'columns' dictionary
         raw_cols: Set[str] = set(raw_table_data["columns"].keys())
         enriched_cols: Set[str] = set(enriched[table_name]["columns"].keys())
         
-        # Detect Data Loss (The "BLOB Trap" mentioned in Audit)
+        # Detect Data Loss
         missing = raw_cols - enriched_cols
         if missing:
             errors.append(f"Table '{table_name}' is missing columns: {list(missing)}")
         
-        # Detect Hallucinations (AI inventing columns)
+        # Detect Hallucinations
         extra = enriched_cols - raw_cols
         if extra:
             errors.append(f"Table '{table_name}' has hallucinated columns: {list(extra)}")
@@ -53,11 +50,11 @@ def validate_schema_node(state: AgentState) -> Dict[str, Any]:
         return {
             "errors": errors,
             "validation_status": "FAILED",
-            "retry_count": current_retries + 1 # Increment to track loop depth
+            "retry_count": current_retries + 1
         }
     else:
         logger.info("Validation Passed. Schema integrity verified.")
         return {
-            "errors": [], # Clear errors on success
+            "errors": [],
             "validation_status": "PASSED"
         }

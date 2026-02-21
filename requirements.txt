@@ -19,6 +19,6 @@ pydantic-settings
 # Utilities
 python-dotenv
 
-# UI (Reserved for later)
+# UI
 streamlit
 streamlit-agraph

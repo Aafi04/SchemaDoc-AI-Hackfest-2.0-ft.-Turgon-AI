@@ -63,15 +63,13 @@ class SQLConnector:
         """Extracts names, types, constraints, and Foreign Keys."""
         cols_out = {}
         
-        # Get standard inspector data
         columns = self.inspector.get_columns(table_name)
         pk_constraint = self.inspector.get_pk_constraint(table_name)
         pk_cols = pk_constraint.get("constrained_columns", [])
         fks = self.inspector.get_foreign_keys(table_name)
         
-        # 1. Prepare FK List for State
         fk_list = []
-        fk_map = {} # Map column -> related_table for tagging
+        fk_map = {}
         
         for fk in fks:
             # SQLAlchemy returns list of cols, we take the first for simplicity in graph
@@ -87,7 +85,6 @@ class SQLConnector:
                     "referred_column": ref_col
                 })
 
-        # 2. Build Column Metadata
         for col in columns:
             name = col["name"]
             tags = []

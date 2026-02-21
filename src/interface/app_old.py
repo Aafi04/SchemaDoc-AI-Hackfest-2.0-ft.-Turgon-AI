@@ -7,7 +7,6 @@ from streamlit_agraph import agraph, Node, Edge, Config
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
-# Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from src.core.config import AppConfig
 from src.pipeline.graph import build_pipeline

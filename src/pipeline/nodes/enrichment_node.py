@@ -17,7 +17,7 @@ from src.backend.services.usage_search import usage_search
 
 logger = logging.getLogger(__name__)
 
-# --- Helper for JSON Serialization ---
+
 class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, Decimal):
@@ -43,7 +43,6 @@ def _extract_text_from_payload(content: Union[str, List, Dict]) -> str:
         text_parts = []
         for part in content:
             if isinstance(part, dict):
-                 # Priority: text > type='text' > content
                 if "text" in part:
                     text_parts.append(part["text"])
                 elif part.get("type") == "text":
@@ -175,13 +174,12 @@ OUTPUT FORMAT:
         except Exception as e:
             return {"errors": [str(e)]}
 
-    # --- 4. DEBUGGED PARSING LOGIC ---
+    # --- 4. Parsing Logic ---
     try:
         logger.info(f"EXTRACTING JSON FROM: {final_content[:200]}...")
         cleaned = _clean_json_string(final_content)
         parsed_enrichment = json.loads(cleaned)
         
-        # CRITICAL FIX: Handle List vs Dict output
         if isinstance(parsed_enrichment, list):
             logger.warning("AI returned a LIST of tables. Converting to Dict...")
             # Attempt to flatten if it's [{ "table": ... }, { "table2": ... }]
@@ -219,7 +217,7 @@ OUTPUT FORMAT:
             if not match_found:
                 logger.warning(f"SKIPPING AI Table '{table_name}' - No match in raw schema.")
 
-        # Cache Write (CRITICAL FIX: Use cls=DecimalEncoder)
+        # Cache Write
         with open(cache_file, "w") as f:
             json.dump({"hash": current_hash, "data": final_enriched_state}, f, cls=DecimalEncoder)
 

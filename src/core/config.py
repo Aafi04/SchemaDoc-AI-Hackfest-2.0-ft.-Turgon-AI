@@ -6,37 +6,32 @@ from dotenv import load_dotenv
 logger = logging.getLogger(__name__)
 
 class AppConfig:
-    # to find project root $$$$ BRO DO NOT CHANGE STRUCTURE AFTER THIS
     BASE_DIR = Path(__file__).resolve().parent.parent.parent
     
-    # just in case environment me doosra api key dala ho pehle se 
     env_path = BASE_DIR / ".env"
     if env_path.exists():
         load_dotenv(dotenv_path=env_path, override=True)
     else:
         logger.warning(f".env file not found at {env_path}")
 
-    # paths
     DATA_DIR = BASE_DIR / "data"
     OUTPUT_DIR = DATA_DIR / "output"
     LOGS_DIR = DATA_DIR / "logs"
 
-    # default waala db
     DEFAULT_DB_CONNECTION = f"sqlite:///{DATA_DIR}/demo.db"
     
     _raw_key = os.getenv("GOOGLE_API_KEY")
     if _raw_key is not None:
         _raw_key = _raw_key.strip().strip('"').strip("'")
     GEMINI_API_KEY = _raw_key
-    GEMINI_MODEL = "gemini-2.5-flash-lite" # TPM kthm ho jaye to change this to some other model, 1.5 nhi hai apne paas use lite or 3.0 smthing
+    GEMINI_MODEL = "gemini-2.5-flash-lite"
     
-    MAX_RETRIES = 3 # FOR LATER123
+    MAX_RETRIES = 3
 
     @classmethod
     def validate(cls):
         if not cls.GEMINI_API_KEY:
             raise ValueError(f"CRITICAL: GOOGLE_API_KEY is missing. Checked path: {cls.env_path}")
-        # api key check krne ke liye # FOR LATER123
         try:
             preview = f"{cls.GEMINI_API_KEY[:6]}...{cls.GEMINI_API_KEY[-4:]}"
             logger.info(f"GOOGLE_API_KEY present. Preview={preview} (len={len(cls.GEMINI_API_KEY)})")

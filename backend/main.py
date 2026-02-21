@@ -10,7 +10,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Ensure project root is in path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from backend.core.config import settings

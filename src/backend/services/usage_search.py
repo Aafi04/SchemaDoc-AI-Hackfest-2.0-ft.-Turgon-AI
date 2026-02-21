@@ -7,7 +7,7 @@ from src.core.config import AppConfig
 logger = logging.getLogger(__name__)
 
 class UsageSearchService:
-    # scanning application or database logs for 'forensic evidence' of col usage.
+    """Scans application/database logs for forensic evidence of column usage."""
 
     def __init__(self, log_filename: str = "usage_logs.sql"):
         self.log_path = AppConfig.DATA_DIR / log_filename
@@ -26,11 +26,9 @@ class UsageSearchService:
         
         try:
             with open(self.log_path, "r", encoding="utf-8") as f:
-                # read all lines efficiently
                 for i, line in enumerate(f):
                     # regex word boundary to avoid partial matches (e.g. 'id' matching 'user_id')
                     if re.search(r'\b' + re.escape(column_name) + r'\b', line, re.IGNORECASE):
-                        # clean whitespace for cleaner llm context
                         clean_line = line.strip()
                         if clean_line:
                             evidence.append(f"Line {i+1}: {clean_line}")
@@ -38,12 +36,10 @@ class UsageSearchService:
             if not evidence:
                 return f"No usage found for '{column_name}' in analyzed logs."
                 
-            # formatting for llm Context Injection
-            return "EVIDENCE FOUND IN LOGS:\n" + "\n".join(evidence[:10]) # limit at 10 lines to save tokens lol
+            return "EVIDENCE FOUND IN LOGS:\n" + "\n".join(evidence[:10])
 
         except Exception as e:
             logger.error(f"Error reading log file: {e}")
             return f"System Error: Could not analyze logs due to {str(e)}"
 
-# instance for easy import
 usage_search = UsageSearchService()

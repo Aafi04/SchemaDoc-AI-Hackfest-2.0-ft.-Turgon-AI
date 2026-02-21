@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 
 def create_demo_db():
-    # Ensure data directory exists
     db_path = Path("data/demo.db")
     db_path.parent.mkdir(parents=True, exist_ok=True)
     
@@ -12,7 +11,6 @@ def create_demo_db():
     
     print(f"Creating demo database at {db_path}...")
     
-    # 1. Users Table (Standard PII)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY,
@@ -22,7 +20,6 @@ def create_demo_db():
     )
     """)
     
-    # 2. Orders Table (Transactional)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS orders (
         order_id INTEGER PRIMARY KEY,
@@ -33,16 +30,14 @@ def create_demo_db():
     )
     """)
     
-    # 3. Legacy Table (Ambiguous columns for AI to solve)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS legacy_metrics (
         metric_id INTEGER PRIMARY KEY,
-        val_x FLOAT,   -- Ambiguous: Is this revenue? usage?
-        flag_y INTEGER -- Ambiguous: Is this a boolean? status code?
+        val_x FLOAT,
+        flag_y INTEGER
     )
     """)
     
-    # 4. Insert Mock Data
     cursor.execute("INSERT OR IGNORE INTO users (id, email, is_active) VALUES (1, 'alice@example.com', 1)")
     cursor.execute("INSERT OR IGNORE INTO users (id, email, is_active) VALUES (2, 'bob@example.com', 0)")
     cursor.execute("INSERT OR IGNORE INTO orders (order_id, user_id, total_amount, status) VALUES (101, 1, 99.99, 'SHIPPED')")
@@ -51,7 +46,6 @@ def create_demo_db():
     conn.commit()
     conn.close()
     
-    # 5. Create Mock Logs for "Sherlock" to find
     log_path = Path("data/usage_logs.sql")
     print(f"Creating mock logs at {log_path}...")
     with open(log_path, "w") as f:
