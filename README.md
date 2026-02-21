@@ -212,9 +212,8 @@ Select any database from the dashboard dropdown and click **Run Pipeline**.
 ### Backend → Railway (Free Tier)
 
 1. [railway.app](https://railway.app) → New Project → Deploy from GitHub
-2. Set **Root Directory** to `backend`
-3. **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-4. Add env var: `GOOGLE_API_KEY` = your key, `CORS_ORIGINS` = your Vercel URL
+2. Root directory stays as **repo root** (don't change it — `railway.toml` handles the rest)
+3. Add env vars: `GOOGLE_API_KEY` = your key, `CORS_ORIGINS` = your Vercel URL
 
 ### Frontend → Vercel (Free Tier)
 

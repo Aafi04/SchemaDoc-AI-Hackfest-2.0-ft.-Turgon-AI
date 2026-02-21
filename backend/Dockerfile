@@ -9,7 +9,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY backend/ ./backend/
 COPY shared/ ./shared/
-COPY data/ ./data/
+
+# Copy data directory (usage logs for ReAct tool)
+RUN mkdir -p data
+COPY data/usage_logs.sql ./data/usage_logs.sql
 
 # Expose port
 EXPOSE 8000
