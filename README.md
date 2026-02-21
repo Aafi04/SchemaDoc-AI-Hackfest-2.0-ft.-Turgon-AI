@@ -1,17 +1,19 @@
 <div align="center">
 
-# ⚡ SchemaDoc AI
+# SchemaDoc AI
 
-### AI-Powered Data Dictionary Generator
+### Intelligent Data Dictionary Agent
 
-_Hackfest 2.0 — Team Dual Core_
+_Hackfest 2.0 ft. Turgon AI — Team Dual Core_
 
-Mohd Aafi (Team Lead) mdaafi04@gmail.com || Rahul Kumar (Frontend Developer) rahulkumar108642@gmail.com
+Mohd Aafi (Team Lead) · Rahul Kumar (Frontend Developer)
 
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.54-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io)
+[![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=next.js&logoColor=white)](https://nextjs.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Orchestration-1C3C3C?logo=langchain&logoColor=white)](https://github.com/langchain-ai/langgraph)
 [![Gemini](https://img.shields.io/badge/Gemini_2.5_Flash-AI_Engine-4285F4?logo=google&logoColor=white)](https://ai.google.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
 
 </div>
 
@@ -19,7 +21,7 @@ Mohd Aafi (Team Lead) mdaafi04@gmail.com || Rahul Kumar (Frontend Developer) rah
 
 ## Overview
 
-SchemaDoc AI connects to any SQL database and automatically generates a complete, AI-enriched data dictionary with quality scoring, knowledge graphs, and natural language querying.
+SchemaDoc AI connects to **any SQL database** — SQLite, PostgreSQL, MySQL, or MSSQL — and automatically generates a complete, AI-enriched data dictionary with quality scoring, relationship visualization, natural language querying, and business-ready reports.
 
 The system uses a **cyclic LangGraph state machine** with a deterministic validation gate that catches AI hallucinations, prevents data loss, and self-corrects via retry loops — guaranteeing schema integrity.
 
@@ -28,41 +30,50 @@ The system uses a **cyclic LangGraph state machine** with a deterministic valida
 ## Architecture
 
 ```
-┌──────────────┐      ┌─────────────────┐     ┌──────────────────┐      ┌─────────────┐
-│   Extract    │────▶│  AI Enrichment  │────▶│   Validation     │────▶│   Output    │
-│  (SQLAlchemy)│      │  (Gemini + ReAct│     │   Gate           │      │  (Streamlit)│
-│              │      │   Tool-Calling) │     │  (Deterministic) │      │             │
-└──────────────┘      └─────────────────┘     └───────┬──────────┘      └─────────────┘
+┌──────────────┐      ┌─────────────────┐     ┌──────────────────┐      ┌──────────────┐
+│   Extract    │────▶│  AI Enrichment  │────▶│   Validation     │────▶│   Dashboard  │
+│  (SQLAlchemy)│      │  (Gemini + ReAct│     │   Gate           │      │  (Next.js)   │
+│  + Profiling │      │   Tool-Calling) │     │  (Deterministic) │      │              │
+└──────────────┘      └─────────────────┘     └───────┬──────────┘      └──────────────┘
                            ▲                          │
                            │    FAILED + retry < 3    │
                            └──────────────────────────┘
 ```
 
-| Layer                 | Role                                                           | Technology                   |
-| --------------------- | -------------------------------------------------------------- | ---------------------------- |
-| **Data Ingestion**    | Dialect-agnostic schema extraction + statistical profiling     | SQLAlchemy 2.0               |
-| **Orchestration**     | Cyclic state machine with conditional retry edges              | LangGraph                    |
-| **Enrichment Engine** | Semantic analysis with forensic log evidence via ReAct agents  | Gemini 2.5 Flash + LangChain |
-| **Validation Gate**   | Anti-hallucination guard — column-level integrity verification | Deterministic Python         |
-| **Presentation**      | Interactive dashboard with 4 tabs                              | Streamlit + streamlit-agraph |
+| Layer                 | Role                                                           | Technology                         |
+| --------------------- | -------------------------------------------------------------- | ---------------------------------- |
+| **Data Ingestion**    | Dialect-agnostic schema extraction + statistical profiling     | SQLAlchemy 2.0, ThreadPoolExecutor |
+| **Orchestration**     | Cyclic state machine with conditional retry edges              | LangGraph                          |
+| **Enrichment Engine** | Semantic analysis with forensic log evidence via ReAct agents  | Gemini 2.5 Flash + LangChain       |
+| **Validation Gate**   | Anti-hallucination guard — column-level integrity verification | Deterministic Python               |
+| **Backend API**       | REST API serving pipeline, chat, export, and schema endpoints  | FastAPI + Uvicorn                  |
+| **Frontend**          | Interactive dashboard with 6 pages                             | Next.js 15 + TailwindCSS           |
 
 ---
 
 ## Features
 
-| Tab                    | Description                                                                                                                                         |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **📊 Overview**        | KPI metrics, AI-generated database summary, health bars, quality alerts, and a full **Pipeline Integrity Log** showing retry/self-correction events |
-| **📋 Schema Explorer** | Table selector with per-column expanders showing stats, tags (PK/FK/PII), descriptions, and sample values                                           |
-| **🕸️ Knowledge Graph** | Interactive ER visualization — node size ∝ row count, color = health score, edges = foreign keys                                                    |
-| **💬 NL → SQL**        | ChatGPT-style natural language to SQL interface grounded in the enriched schema context                                                             |
+| Page                 | Description                                                                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dashboard**        | Run pipelines against demo or enterprise databases, animated pipeline visualizer with real-time stage tracking, retry visualization   |
+| **Schema Explorer**  | Full table browser with per-column stats, tags (PK/FK/PII/UNIQUE), AI descriptions, sample values, null/unique percentages            |
+| **Knowledge Graph**  | Interactive ER diagram — ReactFlow-powered node graph with foreign key edges and table metadata                                       |
+| **NL → SQL Chat**    | Natural language to SQL interface grounded in enriched schema context, markdown-rendered responses with syntax-highlighted SQL        |
+| **Business Reports** | AI-generated executive overview, domain detection, quality issues, relationship map, per-table documentation, downloadable as MD/JSON |
 
 ### Anti-Hallucination Pipeline
 
 - **Deterministic Validation Gate** compares every AI-enriched column set against the raw source of truth
 - Detects **data loss** (missing columns) and **hallucinations** (invented columns)
 - Automatically retries enrichment up to 3 times on failure
-- Full execution trace with caught violations visible in the Pipeline Integrity Log
+- Full execution trace visible in the animated Pipeline Visualizer
+
+### Performance
+
+- **Batched SQL profiling** — all column stats computed in one query per table (not per-column)
+- **Parallel table processing** — ThreadPoolExecutor profiles tables concurrently
+- **Schema caching** — unchanged schemas skip AI enrichment entirely
+- **Report caching** — business reports generated once per run, served instantly on revisit
 
 ---
 
@@ -71,9 +82,10 @@ The system uses a **cyclic LangGraph state machine** with a deterministic valida
 ### Prerequisites
 
 - Python 3.11+
+- Node.js 18+
 - A [Google Gemini API key](https://aistudio.google.com/apikey)
 
-### Setup
+### Backend Setup
 
 ```bash
 # Clone the repository
@@ -93,68 +105,87 @@ pip install -r requirements.txt
 # Configure environment
 cp .env.example .env
 # Edit .env and add your GOOGLE_API_KEY
+
+# Start the backend
+uvicorn backend.main:app --reload --port 8001
 ```
 
-### Download Demo Database
+### Frontend Setup
 
 ```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The dashboard opens at **http://localhost:3000**. The backend API runs at **http://localhost:8001**.
+
+### Demo Databases
+
+```bash
+# Download Chinook (11 tables — music store)
 python data/scripts/get_chinook.py
-```
 
-This downloads the [Chinook](https://github.com/lerocha/chinook-database) sample database (11 tables — music store data).
+# Download Olist (8 tables — Brazilian e-commerce, 550k+ rows)
+python data/scripts/get_olist.py
 
-Optionally, generate the smaller 3-table demo database:
+# Download Bike Store (9 tables — retail sales)
+python data/scripts/get_bikestore.py
 
-```bash
+# Or generate the small 3-table demo database
 python setup_demo.py
 ```
 
-### Run
-
-```bash
-python run_app.py
-```
-
-Or directly:
-
-```bash
-streamlit run src/interface/app.py
-```
-
-The dashboard opens at **http://localhost:8501**. Select a database from the sidebar and click **⚡ Analyze Database**.
+Select any database from the dashboard dropdown and click **Run Pipeline**.
 
 ---
 
 ## Project Structure
 
 ```
-├── .env.example            # Environment template (copy to .env)
-├── .streamlit/
-│   └── config.toml         # Streamlit dark theme config
-├── requirements.txt
-├── run_app.py              # Streamlit launcher
-├── setup_demo.py           # Creates demo.db + mock usage logs
-├── architecture-spec.html  # Detailed architecture specification
+├── .env.example                    # Environment template
+├── requirements.txt                # Python dependencies
+├── backend/
+│   ├── main.py                     # FastAPI application entry point
+│   ├── core/
+│   │   ├── config.py               # Settings (Pydantic BaseSettings)
+│   │   └── state.py                # TypedDict state definitions
+│   ├── api/routes/
+│   │   ├── pipeline.py             # Pipeline execution + database listing
+│   │   ├── schema.py               # Schema overview + table detail
+│   │   ├── chat.py                 # NL → SQL chat endpoint
+│   │   └── export.py               # JSON/MD export + AI business reports
+│   ├── connectors/
+│   │   └── sql_connector.py        # SQLAlchemy extraction + batched profiling
+│   ├── pipeline/
+│   │   ├── graph.py                # LangGraph pipeline builder
+│   │   └── nodes/
+│   │       ├── enrichment_node.py  # Gemini ReAct enrichment
+│   │       └── validation_node.py  # Anti-hallucination gate
+│   └── services/
+│       ├── pipeline_service.py     # Run management + execution
+│       └── usage_search.py         # Forensic log search (ReAct tool)
+├── frontend/
+│   ├── src/app/
+│   │   ├── page.tsx                # Landing page
+│   │   └── dashboard/
+│   │       ├── page.tsx            # Pipeline runner + visualizer
+│   │       ├── schema/page.tsx     # Schema explorer
+│   │       ├── graph/page.tsx      # ER knowledge graph
+│   │       ├── chat/page.tsx       # NL → SQL chat
+│   │       └── reports/page.tsx    # Business report viewer
+│   ├── src/components/
+│   │   ├── PipelineVisualizer.tsx  # Animated pipeline stage component
+│   │   └── layout/                 # NavRail, TopBar, AppShell
+│   └── src/lib/
+│       ├── api.ts                  # API client + TypeScript types
+│       └── utils.ts                # Utility functions
+├── shared/
+│   └── schemas.py                  # Pydantic models shared across backend
 ├── data/
-│   ├── scripts/
-│   │   └── get_chinook.py  # Downloads Chinook SQLite DB
-│   └── usage_logs.sql      # Query logs for ReAct forensic tool
-└── src/
-    ├── core/
-    │   ├── config.py       # App configuration (paths, API keys)
-    │   └── state.py        # TypedDict state definitions (AgentState)
-    ├── backend/
-    │   ├── connectors/
-    │   │   └── sql_connector.py   # SQLAlchemy schema extraction + profiling
-    │   └── services/
-    │       └── usage_search.py    # Forensic log search (ReAct tool)
-    ├── pipeline/
-    │   ├── graph.py               # LangGraph pipeline builder
-    │   └── nodes/
-    │       ├── enrichment_node.py # AI enrichment with Gemini + tool-calling
-    │       └── validation_node.py # Deterministic anti-hallucination gate
-    └── interface/
-        └── app.py                 # Streamlit dashboard (979 lines)
+│   ├── scripts/                    # Database download scripts
+│   └── usage_logs.sql              # Query logs for ReAct tool
+└── src/                            # Original Streamlit prototype (legacy)
 ```
 
 ---
@@ -167,13 +198,34 @@ The dashboard opens at **http://localhost:8501**. Select a database from the sid
 | Orchestration          | LangGraph (cyclic StateGraph)           |
 | LLM Framework          | LangChain Core + LangChain Google GenAI |
 | Database Introspection | SQLAlchemy 2.0 (dialect-agnostic)       |
-| Frontend               | Streamlit 1.54 + streamlit-agraph       |
-| Language               | Python 3.11                             |
+| Backend API            | FastAPI + Uvicorn                       |
+| Frontend               | Next.js 15, TypeScript, TailwindCSS     |
+| Animations             | Framer Motion                           |
+| Data Fetching          | TanStack React Query                    |
+| ER Visualization       | ReactFlow                               |
+| Markdown Rendering     | react-markdown + remark-gfm             |
+
+---
+
+## Deployment
+
+### Backend → Railway (Free Tier)
+
+1. [railway.app](https://railway.app) → New Project → Deploy from GitHub
+2. Set **Root Directory** to `backend`
+3. **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+4. Add env var: `GOOGLE_API_KEY` = your key, `CORS_ORIGINS` = your Vercel URL
+
+### Frontend → Vercel (Free Tier)
+
+1. [vercel.com](https://vercel.com) → Add New Project → Import repo
+2. Set **Root Directory** to `frontend`
+3. Add env var: `NEXT_PUBLIC_API_URL` = your Railway backend URL
+
+> API keys are set in each platform's dashboard — never committed to Git.
 
 ---
 
 ## Team Dual Core
 
-Built for **Hackfest 2.0 ft Turgon AI** — February 2026.
-
-</div>
+Built for **Hackfest 2.0 ft. Turgon AI** — February 2026.
