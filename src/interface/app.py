@@ -526,7 +526,7 @@ with st.sidebar:
     st.markdown("##### Connect Database")
     mode = st.radio(
         "Source",
-        ["Demo Database (3 Tables)"],
+        ["Chinook Database (11 Tables)", "Demo Database (3 Tables)"],
         label_visibility="collapsed",
     )
     if "Chinook" in mode:
