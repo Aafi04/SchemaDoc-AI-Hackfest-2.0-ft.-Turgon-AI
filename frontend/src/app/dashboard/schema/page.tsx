@@ -124,7 +124,19 @@ function TableCard({
   onToggle: () => void;
 }) {
   const score = table.quality_score ?? table.health_score ?? 0;
-  const columns = table.columns || [];
+  // Normalize columns: backend returns dict {name: {...}}, convert to array
+  const columnsRaw = table.columns || {};
+  const columns: any[] = Array.isArray(columnsRaw)
+    ? columnsRaw
+    : Object.entries(columnsRaw).map(([colName, colData]: [string, any]) => ({
+        name: colData.name || colName,
+        type: colData.original_type || colData.type || "",
+        is_primary_key: colData.is_primary_key ?? false,
+        is_foreign_key: colData.is_foreign_key ?? false,
+        nullable: colData.nullable ?? true,
+        ai_description: colData.description || colData.ai_description || null,
+        ...colData,
+      }));
 
   return (
     <motion.div
@@ -244,8 +256,14 @@ export default function SchemaPage() {
       if (!searchQuery) return true;
       const q = searchQuery.toLowerCase();
       if (name.toLowerCase().includes(q)) return true;
-      return table.columns?.some((col: any) =>
-        col.name.toLowerCase().includes(q),
+      const colsArray = Array.isArray(table.columns)
+        ? table.columns
+        : Object.entries(table.columns || {}).map(([k, v]: [string, any]) => ({
+            name: v.name || k,
+            ...v,
+          }));
+      return colsArray.some((col: any) =>
+        (col.name || "").toLowerCase().includes(q),
       );
     },
   );

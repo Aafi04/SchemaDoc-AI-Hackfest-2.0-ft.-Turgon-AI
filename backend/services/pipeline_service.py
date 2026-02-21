@@ -31,7 +31,14 @@ def get_run(run_id: str) -> Optional[Dict[str, Any]]:
 
 def list_runs() -> list:
     return [
-        {"run_id": k, "status": v["status"], "created_at": v["created_at"]}
+        {
+            "run_id": k,
+            "status": v["status"],
+            "created_at": v["created_at"],
+            "schema_enriched": v.get("schema_enriched"),
+            "pipeline_log": v.get("pipeline_log", []),
+            "errors": v.get("errors", []),
+        }
         for k, v in sorted(_pipeline_runs.items(), key=lambda x: x[1]["created_at"], reverse=True)
     ]
 

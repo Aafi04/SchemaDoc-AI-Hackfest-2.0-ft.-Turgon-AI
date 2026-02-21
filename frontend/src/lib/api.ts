@@ -96,9 +96,10 @@ export const api = {
   },
   listDatabases: async () => {
     const res = await listDatabases();
-    return (res.databases || []).map(
-      (d: DatabaseInfo) => d.connection_string || d.name,
-    );
+    return (res.databases || []).map((d: DatabaseInfo) => ({
+      label: d.name || d.id,
+      value: d.connection_string,
+    }));
   },
   getSchema,
   getSchemaOverview,

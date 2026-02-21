@@ -90,9 +90,9 @@ function PipelineRunner() {
         className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-blue-500"
       >
         <option value="">Select database...</option>
-        {databases.map((db: string) => (
-          <option key={db} value={db}>
-            {db}
+        {databases.map((db: any) => (
+          <option key={db.value} value={db.value}>
+            {db.label}
           </option>
         ))}
       </select>
@@ -204,7 +204,11 @@ export default function DashboardPage() {
 
   const totalColumns = latestRun?.result
     ? Object.values(latestRun.result).reduce(
-        (acc: number, table: any) => acc + (table.columns?.length || 0),
+        (acc: number, table: any) =>
+          acc +
+          (Array.isArray(table.columns)
+            ? table.columns.length
+            : Object.keys(table.columns || {}).length),
         0,
       )
     : 0;
@@ -295,7 +299,11 @@ export default function DashboardPage() {
                     key={name}
                     name={name}
                     score={table.quality_score ?? table.health_score ?? 0}
-                    columns={table.columns?.length ?? 0}
+                    columns={
+                      Array.isArray(table.columns)
+                        ? table.columns.length
+                        : Object.keys(table.columns || {}).length
+                    }
                   />
                 ))}
             </div>

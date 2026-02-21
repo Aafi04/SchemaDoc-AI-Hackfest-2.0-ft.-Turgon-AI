@@ -67,9 +67,23 @@ function buildGraph(schema: Record<string, any>) {
   const edges: Edge[] = [];
   const cols = Math.ceil(Math.sqrt(tables.length));
 
+  // Helper to normalize columns dict to array
+  const normalizeCols = (columns: any) => {
+    if (Array.isArray(columns)) return columns;
+    if (!columns || typeof columns !== "object") return [];
+    return Object.entries(columns).map(([k, v]: [string, any]) => ({
+      name: v.name || k,
+      type: v.original_type || v.type || "",
+      is_primary_key: v.is_primary_key ?? false,
+      is_foreign_key: v.is_foreign_key ?? false,
+      ...v,
+    }));
+  };
+
   tables.forEach(([name, table], i) => {
     const row = Math.floor(i / cols);
     const col = i % cols;
+    const colsArray = normalizeCols(table.columns);
 
     nodes.push({
       id: name,
@@ -77,29 +91,50 @@ function buildGraph(schema: Record<string, any>) {
       position: { x: col * 300, y: row * 350 },
       data: {
         label: name,
-        columns: table.columns || [],
+        columns: colsArray,
       },
     });
 
-    // Create edges from foreign key relationships
-    (table.columns || []).forEach((column: any) => {
+    // Create edges from table-level foreign_keys array
+    (table.foreign_keys || []).forEach((fk: any) => {
+      const refTable = fk.referred_table;
+      if (refTable && schema[refTable]) {
+        edges.push({
+          id: `${name}-${fk.column}-${refTable}`,
+          source: name,
+          target: refTable,
+          type: "smoothstep",
+          animated: true,
+          style: { stroke: "#3b82f6", strokeWidth: 1.5 },
+          markerEnd: { type: MarkerType.ArrowClosed, color: "#3b82f6" },
+          label: fk.column,
+          labelStyle: { fontSize: 10, fill: "#71717a" },
+        });
+      }
+    });
+
+    // Also check column-level FK references
+    colsArray.forEach((column: any) => {
       if (column.is_foreign_key && column.references) {
         const refTable =
           typeof column.references === "string"
             ? column.references.split(".")[0]
             : column.references.table;
         if (refTable && schema[refTable]) {
-          edges.push({
-            id: `${name}-${column.name}-${refTable}`,
-            source: name,
-            target: refTable,
-            type: "smoothstep",
-            animated: true,
-            style: { stroke: "#3b82f6", strokeWidth: 1.5 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: "#3b82f6" },
-            label: column.name,
-            labelStyle: { fontSize: 10, fill: "#71717a" },
-          });
+          const edgeId = `${name}-${column.name}-${refTable}`;
+          if (!edges.find((e) => e.id === edgeId)) {
+            edges.push({
+              id: edgeId,
+              source: name,
+              target: refTable,
+              type: "smoothstep",
+              animated: true,
+              style: { stroke: "#3b82f6", strokeWidth: 1.5 },
+              markerEnd: { type: MarkerType.ArrowClosed, color: "#3b82f6" },
+              label: column.name,
+              labelStyle: { fontSize: 10, fill: "#71717a" },
+            });
+          }
         }
       }
     });
