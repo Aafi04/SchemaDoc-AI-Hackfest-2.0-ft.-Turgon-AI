@@ -5,7 +5,8 @@ Ported from src/backend/connectors/sql_connector.py with updated imports.
 from typing import Dict, Any, List, Optional
 import datetime
 import logging
-from sqlalchemy import create_engine, inspect, MetaData, Table, select, func, text, Column
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from sqlalchemy import create_engine, inspect, MetaData, Table, select, func, text, Column, case, literal
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 from backend.core.state import TableSchema, ColumnMetadata, ColumnStats
@@ -19,38 +20,55 @@ class SQLConnector:
         self.inspector = inspect(self.engine)
         self.metadata = MetaData()
 
+    # SQLite internal tables that should never be documented
+    _SYSTEM_TABLES = {
+        "sqlite_sequence", "sqlite_stat1", "sqlite_stat2",
+        "sqlite_stat3", "sqlite_stat4", "sqlite_master",
+    }
+
     def get_live_schema(self) -> Dict[str, TableSchema]:
         """
         Orchestrates the full extraction: Structure + Statistics.
         Returns the 'schema_raw' state object.
         """
         schema_out: Dict[str, TableSchema] = {}
-        table_names = self.inspector.get_table_names()
+        all_tables = self.inspector.get_table_names()
+        # Filter out database-engine internal / system tables
+        table_names = [
+            t for t in all_tables if t.lower() not in self._SYSTEM_TABLES
+        ]
 
-        logger.info(f"Connected to DB. Found tables: {table_names}")
+        logger.info(f"Connected to DB. Found tables: {table_names} (filtered {len(all_tables) - len(table_names)} system tables)")
 
-        for t_name in table_names:
-            try:
-                table_obj = Table(t_name, self.metadata, autoload_with=self.engine)
-                columns_meta, fk_list = self._extract_structure(t_name, table_obj)
-                row_count, health_score, col_stats = self._profile_data(table_obj, columns_meta)
+        def _process_table(t_name: str) -> tuple[str, dict]:
+            """Process one table (structure + profiling).  Thread-safe."""
+            # Each thread gets its own MetaData to avoid shared-state issues
+            local_meta = MetaData()
+            table_obj = Table(t_name, local_meta, autoload_with=self.engine)
+            columns_meta, fk_list = self._extract_structure(t_name, table_obj)
+            row_count, health_score, col_stats = self._profile_data(table_obj, columns_meta)
+            for col_name, stats in col_stats.items():
+                if col_name in columns_meta:
+                    columns_meta[col_name]["stats"] = stats
+            return t_name, {
+                "table_name": t_name,
+                "row_count": row_count,
+                "columns": columns_meta,
+                "health_score": health_score,
+                "description": None,
+                "foreign_keys": fk_list,
+            }
 
-                for col_name, stats in col_stats.items():
-                    if col_name in columns_meta:
-                        columns_meta[col_name]["stats"] = stats
-
-                schema_out[t_name] = {
-                    "table_name": t_name,
-                    "row_count": row_count,
-                    "columns": columns_meta,
-                    "health_score": health_score,
-                    "description": None,
-                    "foreign_keys": fk_list,
-                }
-
-            except Exception as e:
-                logger.error(f"Error processing table '{t_name}': {e}")
-                continue
+        # Process tables in parallel (I/O-bound SQL queries benefit from threads)
+        with ThreadPoolExecutor(max_workers=min(len(table_names), 8)) as pool:
+            futures = {pool.submit(_process_table, t): t for t in table_names}
+            for future in as_completed(futures):
+                t_name = futures[future]
+                try:
+                    name, data = future.result()
+                    schema_out[name] = data
+                except Exception as e:
+                    logger.error(f"Error processing table '{t_name}': {e}")
 
         return schema_out
 
@@ -64,6 +82,15 @@ class SQLConnector:
         pk_constraint = self.inspector.get_pk_constraint(table_name)
         pk_cols = pk_constraint.get("constrained_columns", [])
         fks = self.inspector.get_foreign_keys(table_name)
+
+        # Extract unique constraints
+        unique_cols: set = set()
+        try:
+            for uc in self.inspector.get_unique_constraints(table_name):
+                for col_name in uc.get("column_names", []):
+                    unique_cols.add(col_name)
+        except Exception:
+            pass  # Some dialects may not support this
 
         fk_list = []
         fk_map = {}
@@ -89,6 +116,8 @@ class SQLConnector:
                 tags.append("PK")
             if name in fk_map:
                 tags.append("FK")
+            if name in unique_cols:
+                tags.append("UNIQUE")
 
             cols_out[name] = {
                 "name": name,
@@ -104,33 +133,73 @@ class SQLConnector:
         return cols_out, fk_list
 
     def _profile_data(self, table_obj: Table, cols_meta: Dict[str, ColumnMetadata]):
+        """
+        Profile all columns in ONE batched SQL query per table instead of
+        3-4 queries per column.  This cuts total DB round-trips from
+        ~4*cols to just 2 per table (one aggregate + one sample).
+        """
         stats_out: Dict[str, ColumnStats] = {}
         row_count = 0
         health_score = 100.0
 
         try:
             with self.engine.connect() as conn:
+                # ── 1. Row count ────────────────────────────────────
                 count_query = select(func.count()).select_from(table_obj)
                 row_count = conn.execute(count_query).scalar() or 0
 
                 if row_count == 0:
                     return 0, 100.0, {}
 
+                # ── 2. Build ONE aggregation query for ALL columns ──
+                agg_exprs = []
+                col_order: List[str] = []  # tracks column names in query order
+                numeric_flags: List[bool] = []
+
                 for col_name, meta in cols_meta.items():
                     col_obj = table_obj.c[col_name]
+                    col_order.append(col_name)
 
-                    null_query = select(func.count()).where(col_obj == None)
-                    null_count = conn.execute(null_query).scalar() or 0
-                    null_percentage = round((null_count / row_count) * 100, 2)
-
-                    unique_query = select(func.count(func.distinct(col_obj)))
-                    unique_count = conn.execute(unique_query).scalar() or 0
-                    unique_percentage = (
-                        round((unique_count / row_count) * 100, 2) if row_count > 0 else 0.0
+                    # null count  &  unique count (always)
+                    agg_exprs.append(
+                        func.sum(case((col_obj == None, 1), else_=0)).label(f"{col_name}__nulls")
+                    )
+                    agg_exprs.append(
+                        func.count(func.distinct(col_obj)).label(f"{col_name}__uniq")
                     )
 
-                    sample_query = select(col_obj).where(col_obj != None).limit(3)
-                    samples = [str(r[0]) for r in conn.execute(sample_query).fetchall()]
+                    # min / max / avg for numeric columns
+                    type_str = meta["original_type"].upper()
+                    is_numeric = any(
+                        t in type_str
+                        for t in ["INT", "FLOAT", "DECIMAL", "NUMERIC", "REAL"]
+                    )
+                    numeric_flags.append(is_numeric)
+                    if is_numeric:
+                        agg_exprs.append(func.min(col_obj).label(f"{col_name}__min"))
+                        agg_exprs.append(func.max(col_obj).label(f"{col_name}__max"))
+                        agg_exprs.append(func.avg(col_obj).label(f"{col_name}__avg"))
+
+                agg_query = select(*agg_exprs).select_from(table_obj)
+                agg_row = conn.execute(agg_query).fetchone()
+
+                # ── 3. ONE sample query — grab first 3 non-null rows ─
+                sample_query = select(*[table_obj.c[c] for c in col_order]).limit(3)
+                sample_rows = conn.execute(sample_query).fetchall()
+
+                # ── 4. Unpack results ───────────────────────────────
+                idx = 0  # cursor into agg_row
+                for i, col_name in enumerate(col_order):
+                    null_count = int(agg_row[idx] or 0); idx += 1
+                    unique_count = int(agg_row[idx] or 0); idx += 1
+                    null_percentage = round((null_count / row_count) * 100, 2)
+                    unique_percentage = round((unique_count / row_count) * 100, 2)
+
+                    # samples from the batch sample query
+                    samples = [
+                        str(row[i]) for row in sample_rows
+                        if row[i] is not None
+                    ][:3]
 
                     col_stat: ColumnStats = {
                         "null_count": null_count,
@@ -143,33 +212,18 @@ class SQLConnector:
                         "mean_value": None,
                     }
 
-                    type_str = meta["original_type"].upper()
-                    if any(
-                        t in type_str
-                        for t in ["INT", "FLOAT", "DECIMAL", "NUMERIC", "REAL"]
-                    ):
+                    if numeric_flags[i]:
                         try:
-                            stats_q = select(
-                                func.min(col_obj), func.max(col_obj), func.avg(col_obj)
-                            )
-                            min_v, max_v, avg_v = conn.execute(stats_q).fetchone()
-                            col_stat["min_value"] = (
-                                float(min_v) if min_v is not None else None
-                            )
-                            col_stat["max_value"] = (
-                                float(max_v) if max_v is not None else None
-                            )
-                            col_stat["mean_value"] = (
-                                round(float(avg_v), 4) if avg_v is not None else None
-                            )
-                            if (
-                                min_v is not None
-                                and min_v < 0
-                                and "ID" in col_name.upper()
-                            ):
+                            min_v = agg_row[idx]; idx += 1
+                            max_v = agg_row[idx]; idx += 1
+                            avg_v = agg_row[idx]; idx += 1
+                            col_stat["min_value"] = float(min_v) if min_v is not None else None
+                            col_stat["max_value"] = float(max_v) if max_v is not None else None
+                            col_stat["mean_value"] = round(float(avg_v), 4) if avg_v is not None else None
+                            if min_v is not None and min_v < 0 and "ID" in col_name.upper():
                                 health_score -= 5
                         except Exception:
-                            pass
+                            idx += 3  # skip the 3 numeric slots on error
 
                     stats_out[col_name] = col_stat
 
@@ -179,6 +233,7 @@ class SQLConnector:
                         health_score -= 5.0
 
         except SQLAlchemyError as e:
+            logger.error(f"Profiling error: {e}")
             return row_count, health_score, stats_out
 
         return row_count, max(0.0, health_score), stats_out

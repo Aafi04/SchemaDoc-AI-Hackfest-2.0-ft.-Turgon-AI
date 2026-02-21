@@ -51,9 +51,27 @@ async def list_available_databases():
     if chinook_path.exists():
         databases.append({
             "id": "chinook",
-            "name": "Chinook Database (11 Tables)",
+            "name": "Chinook Music Store (11 Tables)",
             "connection_string": f"sqlite:///{chinook_path}",
             "tables": 11,
+        })
+
+    olist_path = data_dir / "olist.db"
+    if olist_path.exists():
+        databases.append({
+            "id": "olist",
+            "name": "Olist E-Commerce Brazil (8 Tables)",
+            "connection_string": f"sqlite:///{olist_path}",
+            "tables": 8,
+        })
+
+    bikestore_path = data_dir / "bikestore.db"
+    if bikestore_path.exists():
+        databases.append({
+            "id": "bikestore",
+            "name": "Bike Store Sales (9 Tables)",
+            "connection_string": f"sqlite:///{bikestore_path}",
+            "tables": 9,
         })
 
     demo_path = data_dir / "demo.db"

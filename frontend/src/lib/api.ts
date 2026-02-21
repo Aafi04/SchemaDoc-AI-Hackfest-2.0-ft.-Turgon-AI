@@ -73,6 +73,19 @@ export function getExportUrl(
   return `${API_URL}/api/export/${runId}/${format}`;
 }
 
+// ── Reports ──
+export async function getBusinessReport(runId: string) {
+  return fetchAPI<BusinessReport>(`/api/export/${runId}/report`);
+}
+
+export function getReportMarkdownUrl(runId: string): string {
+  return `${API_URL}/api/export/${runId}/report/markdown`;
+}
+
+export function getReportJsonUrl(runId: string): string {
+  return `${API_URL}/api/export/${runId}/report`;
+}
+
 // ── Health ──
 export async function healthCheck() {
   return fetchAPI<{ status: string }>("/api/health");
@@ -90,7 +103,21 @@ export const api = {
       created_at: r.created_at,
       result: r.schema_enriched ?? r.result ?? null,
       pipeline_log: (r.pipeline_log || []).map((e: any) =>
-        typeof e === "string" ? e : e.message || e.step,
+        typeof e === "string"
+          ? {
+              step: "info",
+              status: "success",
+              message: e,
+              icon: "ℹ️",
+              errors: [],
+            }
+          : {
+              step: e.step || "info",
+              status: e.status || "success",
+              message: e.message || e.step,
+              icon: e.icon || "ℹ️",
+              errors: e.errors || [],
+            },
       ),
     }));
   },
@@ -104,10 +131,18 @@ export const api = {
   getSchema,
   getSchemaOverview,
   getTable,
-  sendChatMessage: (params: { question: string; db_path: string }) =>
-    sendChatMessage(params.question, "", []),
+  sendChatMessage: (params: { question: string; run_id: string }) =>
+    sendChatMessage(params.question, params.run_id, []),
   getExportUrl,
+  getBusinessReport,
+  getReportMarkdownUrl,
+  getReportJsonUrl,
   healthCheck,
+  resetSession: async () => {
+    const res = await fetch(`${API_URL}/api/reset`, { method: "POST" });
+    if (!res.ok) throw new Error("Reset failed");
+    return res.json();
+  },
 };
 
 // ── Types ──
@@ -126,7 +161,7 @@ export interface PipelineRun {
   status: string;
   created_at: string;
   result: Record<string, any> | null;
-  pipeline_log: string[];
+  pipeline_log: PipelineLogEntry[];
 }
 
 export interface PipelineRunListItem {
@@ -211,4 +246,73 @@ export interface ChatMessage {
 export interface ChatResponseData {
   response: string;
   sql_query: string | null;
+}
+
+// ── Business Report Types ──
+export interface BusinessReport {
+  report_metadata: {
+    generated_at: string;
+    run_id: string;
+    generator: string;
+    report_type: string;
+  };
+  executive_overview: {
+    executive_summary: string;
+    business_domain: string;
+    key_findings: string[];
+    recommendations: string[];
+    data_governance_notes: string;
+    overall_assessment: string;
+  };
+  database_statistics: {
+    total_tables: number;
+    total_columns: number;
+    total_rows: number;
+    average_health_score: number;
+    pii_columns_detected: number;
+    pii_column_list: string[];
+    foreign_key_count: number;
+  };
+  quality_issues: QualityIssue[];
+  relationships: Relationship[];
+  tables: TableSummary[];
+}
+
+export interface QualityIssue {
+  severity: "critical" | "warning";
+  table: string;
+  issue: string;
+  recommendation: string;
+}
+
+export interface Relationship {
+  source_table: string;
+  source_column: string;
+  target_table: string;
+  target_column: string;
+}
+
+export interface TableSummary {
+  table_name: string;
+  description: string;
+  row_count: number;
+  column_count: number;
+  health_score: number;
+  foreign_keys: ForeignKey[];
+  columns: ColumnDetail[];
+}
+
+export interface ColumnDetail {
+  name: string;
+  type: string;
+  description: string;
+  business_logic: string;
+  tags: string[];
+  potential_pii: boolean;
+  null_percentage: number;
+  unique_percentage: number;
+  sample_values: string[];
+  min_value: number | null;
+  max_value: number | null;
+  mean_value: number | null;
 }

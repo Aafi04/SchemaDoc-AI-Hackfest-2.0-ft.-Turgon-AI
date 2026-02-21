@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import type { PipelineRun } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -14,7 +15,10 @@ import {
   MessageSquare,
   Copy,
   Check,
+  AlertCircle,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -57,9 +61,34 @@ function CodeBlock({ code }: { code: string }) {
 }
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("schemadoc-chat");
+        return saved ? JSON.parse(saved) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Get the latest pipeline run for context
+  const { data: runs = [] } = useQuery<PipelineRun[]>({
+    queryKey: ["runs"],
+    queryFn: api.listRuns,
+  });
+
+  const latestRun = runs.find((r) => r.status === "completed") || null;
+
+  // Persist messages to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("schemadoc-chat", JSON.stringify(messages));
+    }
+  }, [messages]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -69,7 +98,7 @@ export default function ChatPage() {
 
   const mutation = useMutation({
     mutationFn: (question: string) =>
-      api.sendChatMessage({ question, db_path: "" }),
+      api.sendChatMessage({ question, run_id: latestRun?.run_id || "" }),
     onSuccess: (data) => {
       setMessages((prev) => [
         ...prev,
@@ -81,12 +110,12 @@ export default function ChatPage() {
         },
       ]);
     },
-    onError: () => {
+    onError: (err: Error) => {
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: "Sorry, I encountered an error. Please try again.",
+          content: `Error: ${err.message}. Make sure you've run the pipeline first.`,
           timestamp: new Date(),
         },
       ]);
@@ -105,6 +134,11 @@ export default function ChatPage() {
     mutation.mutate(q);
   };
 
+  const clearChat = useCallback(() => {
+    setMessages([]);
+    localStorage.removeItem("schemadoc-chat");
+  }, []);
+
   const suggestions = [
     "Show me all tables with foreign key relationships",
     "Which tables have the most columns?",
@@ -115,11 +149,30 @@ export default function ChatPage() {
   return (
     <div className="mx-auto flex h-[calc(100vh-140px)] max-w-4xl flex-col">
       {/* Header */}
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-zinc-100">AI Chat</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Ask questions about your database schema in natural language
-        </p>
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-100">AI Chat</h1>
+          <p className="mt-1 text-sm text-zinc-500">
+            {latestRun
+              ? `Connected to run ${latestRun.run_id} — Ask about your schema`
+              : "Run the pipeline first to enable chat"}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {!latestRun && (
+            <span className="flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-3 py-1.5 text-xs text-amber-400">
+              <AlertCircle className="h-3.5 w-3.5" /> No pipeline run
+            </span>
+          )}
+          {messages.length > 0 && (
+            <button
+              onClick={clearChat}
+              className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800"
+            >
+              Clear Chat
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Messages */}
@@ -177,7 +230,17 @@ export default function ChatPage() {
                         : "bg-zinc-800 text-zinc-200",
                     )}
                   >
-                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    {msg.role === "assistant" ? (
+                      <div className="prose-sm text-sm text-zinc-200 [&_p]:my-1 [&_ul]:my-1.5 [&_ol]:my-1.5 [&_li]:my-0.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_strong]:text-zinc-100 [&_strong]:font-semibold [&_code]:rounded [&_code]:bg-zinc-700 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-blue-300 [&_code]:text-xs [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-zinc-900 [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_h1]:text-base [&_h1]:font-bold [&_h1]:text-zinc-100 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:text-zinc-100 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-zinc-200 [&_a]:text-blue-400 [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-zinc-600 [&_blockquote]:pl-3 [&_blockquote]:text-zinc-400 [&_hr]:border-zinc-700">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap">
+                        {msg.content}
+                      </p>
+                    )}
                     {msg.sql && <CodeBlock code={msg.sql} />}
                   </div>
 

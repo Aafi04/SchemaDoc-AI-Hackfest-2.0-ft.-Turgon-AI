@@ -79,7 +79,11 @@ def enrich_metadata_node(state: AgentState) -> Dict[str, Any]:
     previous_errors = state.get("errors", [])
 
     # --- 1. Caching Logic ---
-    schema_str = json.dumps(list(schema_raw.keys()), sort_keys=True)
+    # Hash includes table names AND column names for deeper invalidation
+    schema_fingerprint = {
+        t: sorted(d["columns"].keys()) for t, d in schema_raw.items()
+    }
+    schema_str = json.dumps(schema_fingerprint, sort_keys=True)
     current_hash = hashlib.md5(schema_str.encode()).hexdigest()
     cache_file = AppConfig.DATA_DIR / "schema_cache.json"
 
@@ -98,30 +102,27 @@ def enrich_metadata_node(state: AgentState) -> Dict[str, Any]:
         table: {col: meta["original_type"] for col, meta in data["columns"].items()}
         for table, data in schema_raw.items()
     }
+    table_list = list(simplified_schema.keys())
 
-    system_prompt = f"""
-    You are a Data Architect. Generate a JSON Data Dictionary.
-    
-    INPUT: {json.dumps(simplified_schema)}
-    
-    RULES:
-    1. Output strictly valid JSON. No markdown formatting.
-    2. REQUIRED: If a column is ambiguous (like 'val_x', 'id', 'status'), call 'lookup_column_usage'.
-    3. Iterate until you have evidence for all ambiguous columns.
-    4. When done, output the JSON.
-    
-    JSON STRUCTURE:
-    {{
-        "Table_Name": {{
-            "columns": {{
-                "Column_Name": {{
-                    "description": "Business definition...",
-                    "tags": ["PII", "System"],
-                }}
-            }}
-        }}
+    system_prompt = f"""You are a Data Architect. Generate a JSON Data Dictionary.
+
+INPUT SCHEMA ({len(table_list)} tables): {json.dumps(simplified_schema, separators=(',', ':'))}
+
+RULES:
+1. Output ONLY valid JSON — no markdown fences, no explanation text.
+2. You MUST include ALL {len(table_list)} tables: {json.dumps(table_list)}
+3. You MUST include EVERY column listed for each table — do not skip any.
+4. If a column is ambiguous (e.g. 'val_x', 'status'), call 'lookup_column_usage' first.
+5. Keep descriptions concise (1 sentence).
+
+OUTPUT FORMAT:
+{{
+  "TableName": {{
+    "columns": {{
+      "col": {{"description":"...","business_logic":"...","tags":["PII"],"potential_pii":false}}
     }}
-    """
+  }}
+}}"""
 
     messages = [
         SystemMessage(content=system_prompt),

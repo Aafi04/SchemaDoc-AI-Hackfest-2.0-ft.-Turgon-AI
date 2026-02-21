@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -10,18 +11,44 @@ import {
   MessageSquare,
   Settings,
   Database,
+  FileText,
+  RotateCcw,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/schema", label: "Schema", icon: TableProperties },
   { href: "/dashboard/graph", label: "Graph", icon: GitFork },
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
+  { href: "/dashboard/reports", label: "Reports", icon: FileText },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
 export function NavRail() {
   const pathname = usePathname();
+  const queryClient = useQueryClient();
+  const [resetting, setResetting] = useState(false);
+
+  const handleReset = async () => {
+    if (
+      !confirm(
+        "Reset session? This will clear all pipeline runs, reports and caches.",
+      )
+    )
+      return;
+    setResetting(true);
+    try {
+      await api.resetSession();
+      queryClient.clear();
+      window.location.href = "/dashboard";
+    } catch {
+      alert("Reset failed — check backend.");
+    } finally {
+      setResetting(false);
+    }
+  };
 
   return (
     <nav className="fixed left-0 top-0 z-40 flex h-screen w-16 flex-col items-center border-r border-zinc-800 bg-zinc-950 py-4">
@@ -65,6 +92,18 @@ export function NavRail() {
           );
         })}
       </div>
+
+      {/* Reset Session */}
+      <button
+        onClick={handleReset}
+        disabled={resetting}
+        className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg text-zinc-500 transition-all duration-200 hover:bg-red-500/15 hover:text-red-400 disabled:opacity-40 group relative"
+      >
+        <RotateCcw className={cn("h-5 w-5", resetting && "animate-spin")} />
+        <span className="pointer-events-none absolute left-14 rounded-md bg-zinc-800 px-2 py-1 text-xs font-medium text-zinc-200 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 whitespace-nowrap">
+          Reset Session
+        </span>
+      </button>
     </nav>
   );
 }

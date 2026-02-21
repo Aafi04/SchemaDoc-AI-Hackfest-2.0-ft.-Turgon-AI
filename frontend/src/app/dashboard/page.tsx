@@ -4,7 +4,13 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { PipelineRun } from "@/lib/api";
-import { cn, formatNumber, healthColor, healthLabel } from "@/lib/utils";
+import {
+  cn,
+  formatNumber,
+  healthColor,
+  healthLabel,
+  healthBarHex,
+} from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Play,
@@ -20,6 +26,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import Link from "next/link";
+import PipelineVisualizer from "@/components/PipelineVisualizer";
 
 // ── Metric Card ──────────────────────────────────────────────────
 function MetricCard({
@@ -69,6 +76,8 @@ function MetricCard({
 function PipelineRunner() {
   const queryClient = useQueryClient();
   const [selectedDb, setSelectedDb] = useState("");
+  const [customConn, setCustomConn] = useState("");
+  const [showCustom, setShowCustom] = useState(false);
 
   const { data: databases = [] } = useQuery({
     queryKey: ["databases"],
@@ -82,27 +91,59 @@ function PipelineRunner() {
     },
   });
 
+  const connString = showCustom ? customConn.trim() : selectedDb;
+
   return (
-    <div className="flex items-center gap-3">
-      <select
-        value={selectedDb}
-        onChange={(e) => setSelectedDb(e.target.value)}
-        className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-blue-500"
-      >
-        <option value="">Select database...</option>
-        {databases.map((db: any) => (
-          <option key={db.value} value={db.value}>
-            {db.label}
-          </option>
-        ))}
-      </select>
+    <div className="flex items-center gap-2">
+      {!showCustom ? (
+        <>
+          <select
+            value={selectedDb}
+            onChange={(e) => setSelectedDb(e.target.value)}
+            className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-blue-500"
+          >
+            <option value="">Select database...</option>
+            {databases.map((db: any) => (
+              <option key={db.value} value={db.value}>
+                {db.label}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => setShowCustom(true)}
+            className="rounded-lg border border-zinc-700 px-2.5 py-2 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+            title="Connect to external database"
+          >
+            🔗 Custom
+          </button>
+        </>
+      ) : (
+        <>
+          <input
+            type="text"
+            value={customConn}
+            onChange={(e) => setCustomConn(e.target.value)}
+            placeholder="postgresql://user:pass@host:5432/db"
+            className="w-72 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs font-mono text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-blue-500"
+          />
+          <button
+            onClick={() => {
+              setShowCustom(false);
+              setCustomConn("");
+            }}
+            className="rounded-lg border border-zinc-700 px-2.5 py-2 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+          >
+            ← Presets
+          </button>
+        </>
+      )}
 
       <button
-        onClick={() => selectedDb && mutation.mutate({ db_path: selectedDb })}
-        disabled={!selectedDb || mutation.isPending}
+        onClick={() => connString && mutation.mutate({ db_path: connString })}
+        disabled={!connString || mutation.isPending}
         className={cn(
           "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all",
-          selectedDb && !mutation.isPending
+          connString && !mutation.isPending
             ? "bg-blue-600 text-white hover:bg-blue-500 active:scale-[0.98]"
             : "cursor-not-allowed bg-zinc-800 text-zinc-500",
         )}
@@ -138,11 +179,8 @@ function TableHealthRow({
       <div className="flex items-center gap-2">
         <div className="h-1.5 w-20 overflow-hidden rounded-full bg-zinc-800">
           <div
-            className={cn(
-              "h-full rounded-full transition-all",
-              healthColor(score).replace("text-", "bg-"),
-            )}
-            style={{ width: `${score}%` }}
+            className="h-full rounded-full transition-all"
+            style={{ width: `${score}%`, backgroundColor: healthBarHex(score) }}
           />
         </div>
         <span
@@ -151,39 +189,6 @@ function TableHealthRow({
           {score}%
         </span>
       </div>
-    </div>
-  );
-}
-
-// ── Pipeline Log ────────────────────────────────────────────────
-function PipelineLog({ log }: { log: string[] }) {
-  return (
-    <div className="space-y-1.5 font-mono text-xs">
-      <AnimatePresence>
-        {log.slice(-12).map((entry, i) => (
-          <motion.div
-            key={`${entry}-${i}`}
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex gap-2 text-zinc-400"
-          >
-            <span className="text-zinc-600 tabular-nums">
-              {String(i + 1).padStart(2, "0")}
-            </span>
-            <span
-              className={cn(
-                entry.toLowerCase().includes("error")
-                  ? "text-red-400"
-                  : entry.toLowerCase().includes("complete")
-                    ? "text-emerald-400"
-                    : "text-zinc-400",
-              )}
-            >
-              {entry}
-            </span>
-          </motion.div>
-        ))}
-      </AnimatePresence>
     </div>
   );
 }
@@ -324,7 +329,7 @@ export default function DashboardPage() {
           </h2>
 
           {latestRun?.pipeline_log && latestRun.pipeline_log.length > 0 ? (
-            <PipelineLog log={latestRun.pipeline_log} />
+            <PipelineVisualizer log={latestRun.pipeline_log} />
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-zinc-600">
               <Sparkles className="mb-3 h-8 w-8" />

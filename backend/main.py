@@ -63,6 +63,24 @@ app.include_router(chat.router)
 app.include_router(export.router)
 
 
+# ── Reset Session ──
+@app.post("/api/reset")
+async def reset_session():
+    """Clear all in-memory pipeline runs, report caches, and schema cache."""
+    from backend.services.pipeline_service import clear_all_runs
+    from backend.api.routes.export import _report_cache
+
+    clear_all_runs()
+    _report_cache.clear()
+
+    cache_file = settings.DATA_DIR / "schema_cache.json"
+    if cache_file.exists():
+        cache_file.unlink()
+
+    logger.info("Session reset — all runs, caches, and artifacts cleared.")
+    return {"status": "ok", "message": "Session reset successfully"}
+
+
 # ── Health Check ──
 @app.get("/api/health")
 async def health_check():

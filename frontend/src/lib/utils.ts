@@ -16,9 +16,15 @@ export function healthColor(score: number): string {
 }
 
 export function healthBgColor(score: number): string {
-  if (score >= 90) return "bg-green-500";
-  if (score >= 70) return "bg-amber-500";
-  return "bg-red-500";
+  if (score >= 90) return "bg-green-500/15";
+  if (score >= 70) return "bg-amber-500/15";
+  return "bg-red-500/15";
+}
+
+export function healthBarHex(score: number): string {
+  if (score >= 90) return "#4ade80";
+  if (score >= 70) return "#fbbf24";
+  return "#f87171";
 }
 
 export function healthLabel(score: number): string {

@@ -66,12 +66,18 @@ DIRECTIVES:
         response = llm.invoke(messages)
         response_text = response.content.strip()
 
-        # Extract SQL if present
+        # Extract SQL if present and strip it from the prose
         import re
         sql_match = re.search(r"```sql\s*(.*?)\s*```", response_text, re.DOTALL)
         sql_query = sql_match.group(1).strip() if sql_match else None
 
-        return ChatResponse(response=response_text, sql_query=sql_query)
+        # Remove ALL ```sql ... ``` blocks from the prose so the frontend
+        # can render the query once via its dedicated CodeBlock component.
+        clean_text = re.sub(r"```sql\s*.*?\s*```", "", response_text, flags=re.DOTALL).strip()
+        # Collapse any leftover triple-blank-lines
+        clean_text = re.sub(r"\n{3,}", "\n\n", clean_text)
+
+        return ChatResponse(response=clean_text, sql_query=sql_query)
 
     except Exception as e:
         logger.error(f"Chat error: {e}")

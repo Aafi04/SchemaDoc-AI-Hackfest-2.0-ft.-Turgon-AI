@@ -9,6 +9,7 @@ import {
   Background,
   Controls,
   MiniMap,
+  Handle,
   Node,
   Edge,
   Position,
@@ -21,11 +22,21 @@ import { GitFork, Table2 } from "lucide-react";
 function TableNode({ data }: { data: any }) {
   return (
     <div className="min-w-[180px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl shadow-black/30">
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="!bg-blue-500 !w-2 !h-2 !border-zinc-700"
+      />
       <div className="flex items-center gap-2 rounded-t-xl border-b border-zinc-700 bg-zinc-800 px-3 py-2">
         <Table2 className="h-3.5 w-3.5 text-blue-400" />
         <span className="text-xs font-semibold text-zinc-100">
           {data.label}
         </span>
+        {data.fkCount > 0 && (
+          <span className="ml-auto text-[9px] text-blue-400/60">
+            {data.fkCount} FK
+          </span>
+        )}
       </div>
       <div className="max-h-48 overflow-y-auto px-3 py-2 text-[11px]">
         {data.columns?.slice(0, 10).map((col: any) => (
@@ -54,6 +65,11 @@ function TableNode({ data }: { data: any }) {
           </div>
         )}
       </div>
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!bg-blue-500 !w-2 !h-2 !border-zinc-700"
+      />
     </div>
   );
 }
@@ -92,6 +108,7 @@ function buildGraph(schema: Record<string, any>) {
       data: {
         label: name,
         columns: colsArray,
+        fkCount: (table.foreign_keys || []).length,
       },
     });
 

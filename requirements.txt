@@ -7,10 +7,17 @@ langchain-core
 sqlalchemy>=2.0.0
 pandas
 sqlglot
+psycopg2-binary   # PostgreSQL support
+pymysql            # MySQL support
+
+# API Server
+fastapi>=0.100.0
+uvicorn[standard]
+pydantic>=2.0.0
+pydantic-settings
 
 # Utilities
 python-dotenv
-pydantic>=2.0.0
 
 # UI (Reserved for later)
 streamlit

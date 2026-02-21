@@ -25,6 +25,11 @@ class DecimalEncoder(json.JSONEncoder):
 _pipeline_runs: Dict[str, Dict[str, Any]] = {}
 
 
+def clear_all_runs():
+    """Wipe every pipeline run from memory."""
+    _pipeline_runs.clear()
+
+
 def get_run(run_id: str) -> Optional[Dict[str, Any]]:
     return _pipeline_runs.get(run_id)
 

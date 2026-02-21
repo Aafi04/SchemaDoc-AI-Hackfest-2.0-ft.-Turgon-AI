@@ -6,6 +6,8 @@ import {
   GitFork,
   MessageSquare,
   ShieldCheck,
+  FileText,
+  BarChart3,
 } from "lucide-react";
 
 export default function Home() {
@@ -16,7 +18,7 @@ export default function Home() {
         <div className="absolute left-1/2 top-1/3 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-600/10 blur-3xl" />
       </div>
 
-      <main className="relative z-10 flex max-w-3xl flex-col items-center text-center">
+      <main className="relative z-10 flex max-w-4xl flex-col items-center text-center">
         {/* Logo */}
         <div className="mb-8 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-500/10 ring-1 ring-blue-500/20">
           <Database className="h-8 w-8 text-blue-400" />
@@ -30,8 +32,9 @@ export default function Home() {
           </span>
         </h1>
         <p className="mt-4 max-w-lg text-lg text-zinc-400">
-          AI-powered data dictionary generator that automatically documents your
-          database schema with intelligent enrichment and validation.
+          AI-powered data dictionary generator that connects to enterprise
+          databases, extracts schema metadata, analyzes data quality, and
+          produces business-ready documentation.
         </p>
 
         {/* CTA */}
@@ -44,27 +47,37 @@ export default function Home() {
         </Link>
 
         {/* Feature Cards */}
-        <div className="mt-16 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-16 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[
             {
               icon: Sparkles,
               label: "AI Enrichment",
-              desc: "Gemini 2.5 Flash powered",
+              desc: "Gemini 2.5 Flash with ReAct tool-calling",
             },
             {
               icon: ShieldCheck,
               label: "Anti-Hallucination",
-              desc: "Deterministic validation",
+              desc: "Deterministic validation gate with retry loop",
+            },
+            {
+              icon: BarChart3,
+              label: "Statistical Profiling",
+              desc: "Null%, uniqueness, min/max/mean per column",
             },
             {
               icon: GitFork,
               label: "Knowledge Graph",
-              desc: "Interactive ER diagrams",
+              desc: "Interactive ER diagrams with FK relationships",
             },
             {
               icon: MessageSquare,
               label: "NL→SQL Chat",
-              desc: "Natural language queries",
+              desc: "Natural language to SQL query generation",
+            },
+            {
+              icon: FileText,
+              label: "Business Reports",
+              desc: "AI-enhanced export in JSON & Markdown",
             },
           ].map((f) => (
             <div
