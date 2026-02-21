@@ -8,10 +8,13 @@ _Hackfest 2.0 ft. Turgon AI — Team Dual Core_
 
 Mohd Aafi (Team Lead) · Rahul Kumar (Frontend Developer)
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-▶_Try_It-22c55e?style=for-the-badge)](https://schema-doc-ai-hackfest-2-0-ft-turgo.vercel.app)
+
 [![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=next.js&logoColor=white)](https://nextjs.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Orchestration-1C3C3C?logo=langchain&logoColor=white)](https://github.com/langchain-ai/langgraph)
 [![Gemini](https://img.shields.io/badge/Gemini_2.5_Flash-AI_Engine-4285F4?logo=google&logoColor=white)](https://ai.google.dev)
+[![Neon](https://img.shields.io/badge/Neon-PostgreSQL-00e599?logo=postgresql&logoColor=white)](https://neon.tech)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
 
@@ -25,29 +28,34 @@ SchemaDoc AI connects to **any SQL database** — SQLite, PostgreSQL, MySQL, or 
 
 The system uses a **cyclic LangGraph state machine** with a deterministic validation gate that catches AI hallucinations, prevents data loss, and self-corrects via retry loops — guaranteeing schema integrity.
 
+**Live deployment:** Frontend on [Vercel](https://schema-doc-ai-hackfest-2-0-ft-turgo.vercel.app) · Backend on [Railway](https://schemadoc-ai-hackfest-20-ft-turgon-ai-production.up.railway.app/api/health) · Database on [Neon PostgreSQL](https://neon.tech)
+
 ---
 
 ## Architecture
 
 ```
-┌──────────────┐      ┌─────────────────┐     ┌──────────────────┐      ┌──────────────┐
-│   Extract    │────▶│  AI Enrichment  │────▶│   Validation     │────▶│   Dashboard  │
-│  (SQLAlchemy)│      │  (Gemini + ReAct│     │   Gate           │      │  (Next.js)   │
-│  + Profiling │      │   Tool-Calling) │     │  (Deterministic) │      │              │
-└──────────────┘      └─────────────────┘     └───────┬──────────┘      └──────────────┘
-                           ▲                          │
-                           │    FAILED + retry < 3    │
-                           └──────────────────────────┘
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│     Extract      │────▶│  AI Enrichment   │────▶│   Validation     │────▶│    Dashboard     │
+│  (SQLAlchemy +   │     │  (Gemini 2.5     │     │   Gate           │     │  (Next.js 15 +   │
+│   Profiling)     │     │   Flash + ReAct) │     │  (Deterministic) │     │   TailwindCSS)   │
+└──────────────────┘     └──────────────────┘     └───────┬──────────┘     └──────────────────┘
+        │                        ▲                        │
+        │                        │  FAILED + retry < 3    │
+  Neon PostgreSQL                └────────────────────────┘
+  (3 databases,
+   575k+ rows)
 ```
 
 | Layer                 | Role                                                           | Technology                         |
 | --------------------- | -------------------------------------------------------------- | ---------------------------------- |
 | **Data Ingestion**    | Dialect-agnostic schema extraction + statistical profiling     | SQLAlchemy 2.0, ThreadPoolExecutor |
-| **Orchestration**     | Cyclic state machine with conditional retry edges              | LangGraph                          |
-| **Enrichment Engine** | Semantic analysis with forensic log evidence via ReAct agents  | Gemini 2.5 Flash + LangChain       |
+| **Orchestration**     | Cyclic state machine with conditional retry edges              | LangGraph StateGraph               |
+| **Enrichment Engine** | Semantic analysis with forensic log evidence via ReAct agents  | Gemini 2.5 Flash + LangChain      |
 | **Validation Gate**   | Anti-hallucination guard — column-level integrity verification | Deterministic Python               |
 | **Backend API**       | REST API serving pipeline, chat, export, and schema endpoints  | FastAPI + Uvicorn                  |
-| **Frontend**          | Interactive dashboard with 6 pages                             | Next.js 15 + TailwindCSS           |
+| **Frontend**          | Interactive dashboard with 7 pages                             | Next.js 15 + TailwindCSS          |
+| **Cloud Database**    | 3 real-world PostgreSQL databases (575k+ rows)                 | Neon PostgreSQL (serverless)       |
 
 ---
 
@@ -55,11 +63,23 @@ The system uses a **cyclic LangGraph state machine** with a deterministic valida
 
 | Page                 | Description                                                                                                                           |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| **Dashboard**        | Run pipelines against demo or enterprise databases, animated pipeline visualizer with real-time stage tracking, retry visualization   |
-| **Schema Explorer**  | Full table browser with per-column stats, tags (PK/FK/PII/UNIQUE), AI descriptions, sample values, null/unique percentages            |
+| **Landing Page**     | Animated hero with feature showcase, tech stack badges, and team info                                                                 |
+| **Dashboard**        | Run pipelines against cloud databases, animated pipeline visualizer with real-time stage tracking, retry visualization                |
+| **Schema Explorer**  | Full table browser with per-column stats, tags (PK/FK/PII/UNIQUE), AI descriptions, sample values, null/unique percentages           |
 | **Knowledge Graph**  | Interactive ER diagram — ReactFlow-powered node graph with foreign key edges and table metadata                                       |
-| **NL → SQL Chat**    | Natural language to SQL interface grounded in enriched schema context, markdown-rendered responses with syntax-highlighted SQL        |
+| **NL → SQL Chat**    | Natural language to SQL interface grounded in enriched schema context, markdown-rendered responses with syntax-highlighted SQL         |
 | **Business Reports** | AI-generated executive overview, domain detection, quality issues, relationship map, per-table documentation, downloadable as MD/JSON |
+| **Settings**         | Connection health status, session management, and reset                                                                               |
+
+### Cloud Databases (Always Available)
+
+Three real-world databases hosted on Neon PostgreSQL — no local setup required:
+
+| Database                        | Tables | Rows     | Domain                           |
+| ------------------------------- | ------ | -------- | -------------------------------- |
+| **Olist E-Commerce Brazil**     | 8      | 550,000+ | Brazilian marketplace orders     |
+| **Bike Store Sales**            | 9      | 9,000+   | Retail store inventory & orders  |
+| **Chinook Music Store**         | 11     | 15,600+  | Digital music store transactions |
 
 ### Anti-Hallucination Pipeline
 
@@ -74,10 +94,17 @@ The system uses a **cyclic LangGraph state machine** with a deterministic valida
 - **Parallel table processing** — ThreadPoolExecutor profiles tables concurrently
 - **Schema caching** — unchanged schemas skip AI enrichment entirely
 - **Report caching** — business reports generated once per run, served instantly on revisit
+- **Event-based connection pooling** — compatible with Neon's serverless pooler via `SET search_path`
 
 ---
 
-## Quick Start
+## Live Demo
+
+Visit **[schema-doc-ai-hackfest-2-0-ft-turgo.vercel.app](https://schema-doc-ai-hackfest-2-0-ft-turgo.vercel.app)** — select any database from the dropdown and click **Run Pipeline**. No setup required.
+
+---
+
+## Local Development
 
 ### Prerequisites
 
@@ -85,7 +112,7 @@ The system uses a **cyclic LangGraph state machine** with a deterministic valida
 - Node.js 18+
 - A [Google Gemini API key](https://aistudio.google.com/apikey)
 
-### Backend Setup
+### Backend
 
 ```bash
 # Clone the repository
@@ -110,7 +137,7 @@ cp .env.example .env
 uvicorn backend.main:app --reload --port 8001
 ```
 
-### Frontend Setup
+### Frontend
 
 ```bash
 cd frontend
@@ -120,30 +147,25 @@ npm run dev
 
 The dashboard opens at **http://localhost:3000**. The backend API runs at **http://localhost:8001**.
 
-### Demo Databases
+### Local SQLite Databases (Optional)
+
+For offline development with local SQLite files:
 
 ```bash
-# Download Chinook (11 tables — music store)
-python data/scripts/get_chinook.py
-
-# Download Olist (8 tables — Brazilian e-commerce, 550k+ rows)
-python data/scripts/get_olist.py
-
-# Download Bike Store (9 tables — retail sales)
-python data/scripts/get_bikestore.py
-
-# Or generate the small 3-table demo database
-python setup_demo.py
+python data/scripts/get_chinook.py     # Chinook (11 tables)
+python data/scripts/get_olist.py       # Olist (8 tables, 550k+ rows)
+python data/scripts/get_bikestore.py   # Bike Store (9 tables)
+python setup_demo.py                   # Small 3-table demo DB
 ```
 
-Select any database from the dashboard dropdown and click **Run Pipeline**.
+> When `NEON_DATABASE_URL` is set in `.env`, cloud databases appear automatically in the dropdown alongside any local SQLite files.
 
 ---
 
 ## Project Structure
 
 ```
-├── .env.example                    # Environment template
+├── railway.toml                    # Railway deployment config (Nixpacks)
 ├── requirements.txt                # Python dependencies
 ├── backend/
 │   ├── main.py                     # FastAPI application entry point
@@ -167,13 +189,14 @@ Select any database from the dashboard dropdown and click **Run Pipeline**.
 │       └── usage_search.py         # Forensic log search (ReAct tool)
 ├── frontend/
 │   ├── src/app/
-│   │   ├── page.tsx                # Landing page
+│   │   ├── page.tsx                # Animated landing page
 │   │   └── dashboard/
 │   │       ├── page.tsx            # Pipeline runner + visualizer
 │   │       ├── schema/page.tsx     # Schema explorer
 │   │       ├── graph/page.tsx      # ER knowledge graph
 │   │       ├── chat/page.tsx       # NL → SQL chat
-│   │       └── reports/page.tsx    # Business report viewer
+│   │       ├── reports/page.tsx    # Business report viewer
+│   │       └── settings/page.tsx   # Health check + session reset
 │   ├── src/components/
 │   │   ├── PipelineVisualizer.tsx  # Animated pipeline stage component
 │   │   └── layout/                 # NavRail, TopBar, AppShell
@@ -181,11 +204,10 @@ Select any database from the dashboard dropdown and click **Run Pipeline**.
 │       ├── api.ts                  # API client + TypeScript types
 │       └── utils.ts                # Utility functions
 ├── shared/
-│   └── schemas.py                  # Pydantic models shared across backend
-├── data/
-│   ├── scripts/                    # Database download scripts
-│   └── usage_logs.sql              # Query logs for ReAct tool
-└── src/                            # Original Streamlit prototype (legacy)
+│   └── schemas.py                  # Pydantic request/response models
+└── data/
+    ├── scripts/                    # Database download scripts
+    └── usage_logs.sql              # Query logs for ReAct tool
 ```
 
 ---
@@ -198,30 +220,48 @@ Select any database from the dashboard dropdown and click **Run Pipeline**.
 | Orchestration          | LangGraph (cyclic StateGraph)           |
 | LLM Framework          | LangChain Core + LangChain Google GenAI |
 | Database Introspection | SQLAlchemy 2.0 (dialect-agnostic)       |
+| Cloud Database         | Neon PostgreSQL (serverless pooler)     |
 | Backend API            | FastAPI + Uvicorn                       |
 | Frontend               | Next.js 15, TypeScript, TailwindCSS     |
 | Animations             | Framer Motion                           |
 | Data Fetching          | TanStack React Query                    |
 | ER Visualization       | ReactFlow                               |
 | Markdown Rendering     | react-markdown + remark-gfm             |
+| Backend Hosting        | Railway (Nixpacks)                      |
+| Frontend Hosting       | Vercel                                  |
 
 ---
 
 ## Deployment
 
-### Backend → Railway (Free Tier)
+The application is **fully deployed and publicly accessible**:
+
+| Service     | Platform  | URL                                                                                                                         |
+| ----------- | --------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Frontend    | Vercel    | [schema-doc-ai-hackfest-2-0-ft-turgo.vercel.app](https://schema-doc-ai-hackfest-2-0-ft-turgo.vercel.app)                   |
+| Backend API | Railway   | [schemadoc-ai-hackfest-20-ft-turgon-ai-production.up.railway.app](https://schemadoc-ai-hackfest-20-ft-turgon-ai-production.up.railway.app/api/health) |
+| Database    | Neon      | PostgreSQL serverless (3 schemas, 575k+ rows)                                                                               |
+
+### Self-Hosting
+
+<details>
+<summary>Deploy your own instance</summary>
+
+#### Backend → Railway
 
 1. [railway.app](https://railway.app) → New Project → Deploy from GitHub
-2. Root directory stays as **repo root** (don't change it — `railway.toml` handles the rest)
-3. Add env vars: `GOOGLE_API_KEY` = your key, `CORS_ORIGINS` = your Vercel URL
+2. Root directory = **repo root** (`railway.toml` handles the config)
+3. Add env vars: `GOOGLE_API_KEY`, `NEON_DATABASE_URL`, `CORS_ORIGINS`
 
-### Frontend → Vercel (Free Tier)
+#### Frontend → Vercel
 
 1. [vercel.com](https://vercel.com) → Add New Project → Import repo
 2. Set **Root Directory** to `frontend`
 3. Add env var: `NEXT_PUBLIC_API_URL` = your Railway backend URL
 
 > API keys are set in each platform's dashboard — never committed to Git.
+
+</details>
 
 ---
 
