@@ -4,6 +4,10 @@
 # Allow only what the Dockerfile needs
 !backend/
 !shared/
+
+# Allow data dir first, then exclude everything inside, then whitelist
+!data/
+data/*
 !data/usage_logs.sql
 !data/scripts/
 
