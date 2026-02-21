@@ -1,0 +1,13 @@
+# Ignore everything by default
+*
+
+# Allow only what the Dockerfile needs
+!backend/
+!shared/
+!data/usage_logs.sql
+!data/scripts/
+
+# Re-ignore stuff inside allowed dirs
+backend/__pycache__/
+backend/**/__pycache__/
+shared/__pycache__/
