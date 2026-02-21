@@ -43,44 +43,50 @@ async def get_pipeline_run(run_id: str):
 
 @router.get("/databases")
 async def list_available_databases():
-    """List available demo databases."""
-    data_dir = settings.DATA_DIR
+    """List available databases — cloud PostgreSQL + local SQLite."""
     databases = []
+    neon_url = settings.NEON_DATABASE_URL
 
-    chinook_path = data_dir / "chinook.db"
-    if chinook_path.exists():
+    # ── Cloud PostgreSQL (Neon) — always available when configured ──
+    if neon_url:
+        base = neon_url.split("?")[0]
+        params = "sslmode=require"
+
+        databases.append({
+            "id": "olist",
+            "name": "Olist E-Commerce Brazil (8 Tables) [PostgreSQL]",
+            "connection_string": f"{base}?{params}&options=-csearch_path%3Dolist",
+            "tables": 8,
+        })
+        databases.append({
+            "id": "bikestore",
+            "name": "Bike Store Sales (9 Tables) [PostgreSQL]",
+            "connection_string": f"{base}?{params}&options=-csearch_path%3Dbikestore",
+            "tables": 9,
+        })
         databases.append({
             "id": "chinook",
-            "name": "Chinook Music Store (11 Tables)",
-            "connection_string": f"sqlite:///{chinook_path}",
+            "name": "Chinook Music Store (11 Tables) [PostgreSQL]",
+            "connection_string": f"{base}?{params}&options=-csearch_path%3Dchinook",
             "tables": 11,
         })
 
-    olist_path = data_dir / "olist.db"
-    if olist_path.exists():
-        databases.append({
-            "id": "olist",
-            "name": "Olist E-Commerce Brazil (8 Tables)",
-            "connection_string": f"sqlite:///{olist_path}",
-            "tables": 8,
-        })
+    # ── Local SQLite fallback (for development) ──
+    data_dir = settings.DATA_DIR
 
-    bikestore_path = data_dir / "bikestore.db"
-    if bikestore_path.exists():
-        databases.append({
-            "id": "bikestore",
-            "name": "Bike Store Sales (9 Tables)",
-            "connection_string": f"sqlite:///{bikestore_path}",
-            "tables": 9,
-        })
-
-    demo_path = data_dir / "demo.db"
-    if demo_path.exists():
-        databases.append({
-            "id": "demo",
-            "name": "Demo Database (3 Tables)",
-            "connection_string": f"sqlite:///{demo_path}",
-            "tables": 3,
-        })
+    for db_id, name, filename, table_count in [
+        ("chinook_local", "Chinook Music Store (11 Tables) [SQLite]", "chinook.db", 11),
+        ("olist_local", "Olist E-Commerce Brazil (8 Tables) [SQLite]", "olist.db", 8),
+        ("bikestore_local", "Bike Store Sales (9 Tables) [SQLite]", "bikestore.db", 9),
+        ("demo", "Demo Database (3 Tables) [SQLite]", "demo.db", 3),
+    ]:
+        path = data_dir / filename
+        if path.exists():
+            databases.append({
+                "id": db_id,
+                "name": name,
+                "connection_string": f"sqlite:///{path}",
+                "tables": table_count,
+            })
 
     return {"databases": databases}
