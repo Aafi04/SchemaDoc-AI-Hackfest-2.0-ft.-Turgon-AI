@@ -1,22 +1,30 @@
+"""
+SQL Connector — dialect-agnostic schema extraction + statistical profiling.
+Ported from src/backend/connectors/sql_connector.py with updated imports.
+"""
 from typing import Dict, Any, List, Optional
 import datetime
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from sqlalchemy import create_engine, inspect, MetaData, Table, select, func, text, Column, case, literal
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
-from src.core.state import TableSchema, ColumnMetadata, ColumnStats
+from backend.core.state import TableSchema, ColumnMetadata, ColumnStats
+
+logger = logging.getLogger(__name__)
+
 
 class SQLConnector:
+    def __init__(self, connection_string: str):
+        self.engine = create_engine(connection_string)
+        self.inspector = inspect(self.engine)
+        self.metadata = MetaData()
+
     # SQLite internal tables that should never be documented
     _SYSTEM_TABLES = {
         "sqlite_sequence", "sqlite_stat1", "sqlite_stat2",
         "sqlite_stat3", "sqlite_stat4", "sqlite_master",
     }
-
-    def __init__(self, connection_string: str):
-        self.engine = create_engine(connection_string)
-        self.inspector = inspect(self.engine)
-        self.metadata = MetaData()
 
     def get_live_schema(self) -> Dict[str, TableSchema]:
         """
@@ -25,12 +33,16 @@ class SQLConnector:
         """
         schema_out: Dict[str, TableSchema] = {}
         all_tables = self.inspector.get_table_names()
-        table_names = [t for t in all_tables if t.lower() not in self._SYSTEM_TABLES]
+        # Filter out database-engine internal / system tables
+        table_names = [
+            t for t in all_tables if t.lower() not in self._SYSTEM_TABLES
+        ]
 
-        print(f"Connected to DB. Found tables: {table_names} (filtered {len(all_tables) - len(table_names)} system tables)")
+        logger.info(f"Connected to DB. Found tables: {table_names} (filtered {len(all_tables) - len(table_names)} system tables)")
 
         def _process_table(t_name: str) -> tuple[str, dict]:
             """Process one table (structure + profiling).  Thread-safe."""
+            # Each thread gets its own MetaData to avoid shared-state issues
             local_meta = MetaData()
             table_obj = Table(t_name, local_meta, autoload_with=self.engine)
             columns_meta, fk_list = self._extract_structure(t_name, table_obj)
@@ -47,6 +59,7 @@ class SQLConnector:
                 "foreign_keys": fk_list,
             }
 
+        # Process tables in parallel (I/O-bound SQL queries benefit from threads)
         with ThreadPoolExecutor(max_workers=min(len(table_names), 8)) as pool:
             futures = {pool.submit(_process_table, t): t for t in table_names}
             for future in as_completed(futures):
@@ -55,45 +68,57 @@ class SQLConnector:
                     name, data = future.result()
                     schema_out[name] = data
                 except Exception as e:
-                    print(f"Error processing table '{t_name}': {e}")
+                    logger.error(f"Error processing table '{t_name}': {e}")
 
         return schema_out
 
-    def _extract_structure(self, table_name: str, table_obj: Table) -> tuple[Dict[str, ColumnMetadata], List[dict]]:
+    def _extract_structure(
+        self, table_name: str, table_obj: Table
+    ) -> tuple[Dict[str, ColumnMetadata], List[dict]]:
         """Extracts names, types, constraints, and Foreign Keys."""
         cols_out = {}
-        
-        # Get standard inspector data
+
         columns = self.inspector.get_columns(table_name)
         pk_constraint = self.inspector.get_pk_constraint(table_name)
         pk_cols = pk_constraint.get("constrained_columns", [])
         fks = self.inspector.get_foreign_keys(table_name)
-        
-        # 1. Prepare FK List for State
+
+        # Extract unique constraints
+        unique_cols: set = set()
+        try:
+            for uc in self.inspector.get_unique_constraints(table_name):
+                for col_name in uc.get("column_names", []):
+                    unique_cols.add(col_name)
+        except Exception:
+            pass  # Some dialects may not support this
+
         fk_list = []
-        fk_map = {} # Map column -> related_table for tagging
-        
+        fk_map = {}
+
         for fk in fks:
-            # SQLAlchemy returns list of cols, we take the first for simplicity in graph
             if fk["constrained_columns"]:
                 local_col = fk["constrained_columns"][0]
                 ref_table = fk["referred_table"]
                 ref_col = fk["referred_columns"][0]
-                
                 fk_map[local_col] = ref_table
-                fk_list.append({
-                    "column": local_col,
-                    "referred_table": ref_table,
-                    "referred_column": ref_col
-                })
+                fk_list.append(
+                    {
+                        "column": local_col,
+                        "referred_table": ref_table,
+                        "referred_column": ref_col,
+                    }
+                )
 
-        # 2. Build Column Metadata
         for col in columns:
             name = col["name"]
             tags = []
-            if name in pk_cols: tags.append("PK")
-            if name in fk_map: tags.append("FK")
-            
+            if name in pk_cols:
+                tags.append("PK")
+            if name in fk_map:
+                tags.append("FK")
+            if name in unique_cols:
+                tags.append("UNIQUE")
+
             cols_out[name] = {
                 "name": name,
                 "original_type": str(col["type"]),
@@ -102,37 +127,40 @@ class SQLConnector:
                 "business_logic": None,
                 "potential_pii": False,
                 "tags": tags,
-                "stats": None
+                "stats": None,
             }
-            
+
         return cols_out, fk_list
 
     def _profile_data(self, table_obj: Table, cols_meta: Dict[str, ColumnMetadata]):
         """
         Profile all columns in ONE batched SQL query per table instead of
-        3-4 queries per column.  Cuts total DB round-trips from ~4*cols to 2.
+        3-4 queries per column.  This cuts total DB round-trips from
+        ~4*cols to just 2 per table (one aggregate + one sample).
         """
         stats_out: Dict[str, ColumnStats] = {}
         row_count = 0
         health_score = 100.0
-        
+
         try:
             with self.engine.connect() as conn:
+                # ── 1. Row count ────────────────────────────────────
                 count_query = select(func.count()).select_from(table_obj)
                 row_count = conn.execute(count_query).scalar() or 0
-                
+
                 if row_count == 0:
                     return 0, 100.0, {}
 
-                # ── Build ONE aggregation query for ALL columns ──
+                # ── 2. Build ONE aggregation query for ALL columns ──
                 agg_exprs = []
-                col_order: List[str] = []
+                col_order: List[str] = []  # tracks column names in query order
                 numeric_flags: List[bool] = []
 
                 for col_name, meta in cols_meta.items():
                     col_obj = table_obj.c[col_name]
                     col_order.append(col_name)
 
+                    # null count  &  unique count (always)
                     agg_exprs.append(
                         func.sum(case((col_obj == None, 1), else_=0)).label(f"{col_name}__nulls")
                     )
@@ -140,6 +168,7 @@ class SQLConnector:
                         func.count(func.distinct(col_obj)).label(f"{col_name}__uniq")
                     )
 
+                    # min / max / avg for numeric columns
                     type_str = meta["original_type"].upper()
                     is_numeric = any(
                         t in type_str
@@ -154,18 +183,19 @@ class SQLConnector:
                 agg_query = select(*agg_exprs).select_from(table_obj)
                 agg_row = conn.execute(agg_query).fetchone()
 
-                # ── ONE sample query ──
+                # ── 3. ONE sample query — grab first 3 non-null rows ─
                 sample_query = select(*[table_obj.c[c] for c in col_order]).limit(3)
                 sample_rows = conn.execute(sample_query).fetchall()
 
-                # ── Unpack results ──
-                idx = 0
+                # ── 4. Unpack results ───────────────────────────────
+                idx = 0  # cursor into agg_row
                 for i, col_name in enumerate(col_order):
                     null_count = int(agg_row[idx] or 0); idx += 1
                     unique_count = int(agg_row[idx] or 0); idx += 1
                     null_percentage = round((null_count / row_count) * 100, 2)
                     unique_percentage = round((unique_count / row_count) * 100, 2)
 
+                    # samples from the batch sample query
                     samples = [
                         str(row[i]) for row in sample_rows
                         if row[i] is not None
@@ -179,9 +209,9 @@ class SQLConnector:
                         "sample_values": samples,
                         "min_value": None,
                         "max_value": None,
-                        "mean_value": None
+                        "mean_value": None,
                     }
-                    
+
                     if numeric_flags[i]:
                         try:
                             min_v = agg_row[idx]; idx += 1
@@ -193,16 +223,17 @@ class SQLConnector:
                             if min_v is not None and min_v < 0 and "ID" in col_name.upper():
                                 health_score -= 5
                         except Exception:
-                            idx += 3
-                    
+                            idx += 3  # skip the 3 numeric slots on error
+
                     stats_out[col_name] = col_stat
-                    
+
                     if null_percentage > 10.0:
                         health_score -= 2.5
                     if null_percentage > 50.0:
                         health_score -= 5.0
 
         except SQLAlchemyError as e:
+            logger.error(f"Profiling error: {e}")
             return row_count, health_score, stats_out
 
         return row_count, max(0.0, health_score), stats_out

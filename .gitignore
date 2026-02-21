@@ -34,11 +34,11 @@ desktop.ini
 .streamlit/secrets.toml
 
 # ── Data (generated / downloaded at runtime) ──
-data/chinook.db
-data/demo.db
+data/*.db
 data/schema_cache.json
 data/output/
 data/logs/
+*.zip
 
 # ── Misc ──
 *.log
