@@ -1,0 +1,213 @@
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+async function fetchAPI<T>(
+  endpoint: string,
+  options?: RequestInit,
+): Promise<T> {
+  const res = await fetch(`${API_URL}${endpoint}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+    ...options,
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(error.detail || `API error: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+// ── Pipeline ──
+export async function runPipeline(connectionString: string) {
+  return fetchAPI<PipelineRunResult>("/api/pipeline/run", {
+    method: "POST",
+    body: JSON.stringify({ connection_string: connectionString }),
+  });
+}
+
+export async function getPipelineRun(runId: string) {
+  return fetchAPI<PipelineRunResult>(`/api/pipeline/run/${runId}`);
+}
+
+export async function listPipelineRuns() {
+  return fetchAPI<PipelineRunListItem[]>("/api/pipeline/runs");
+}
+
+export async function listDatabases() {
+  return fetchAPI<{ databases: DatabaseInfo[] }>("/api/pipeline/databases");
+}
+
+// ── Schema ──
+export async function getSchema(runId: string) {
+  return fetchAPI<SchemaResult>(`/api/schema/${runId}`);
+}
+
+export async function getSchemaOverview(runId: string) {
+  return fetchAPI<OverviewResult>(`/api/schema/${runId}/overview`);
+}
+
+export async function getTable(runId: string, tableName: string) {
+  return fetchAPI<TableSchema>(`/api/schema/${runId}/table/${tableName}`);
+}
+
+// ── Chat ──
+export async function sendChatMessage(
+  message: string,
+  runId: string,
+  history: ChatMessage[],
+) {
+  return fetchAPI<ChatResponseData>("/api/chat", {
+    method: "POST",
+    body: JSON.stringify({ message, run_id: runId, history }),
+  });
+}
+
+// ── Export ──
+export function getExportUrl(
+  runId: string,
+  format: "json" | "markdown",
+): string {
+  return `${API_URL}/api/export/${runId}/${format}`;
+}
+
+// ── Health ──
+export async function healthCheck() {
+  return fetchAPI<{ status: string }>("/api/health");
+}
+
+// ── Aggregated API object ──
+export const api = {
+  runPipeline: (params: { db_path: string }) => runPipeline(params.db_path),
+  getPipelineRun,
+  listRuns: async (): Promise<PipelineRun[]> => {
+    const runs = await listPipelineRuns();
+    return runs.map((r: any) => ({
+      run_id: r.run_id,
+      status: r.status,
+      created_at: r.created_at,
+      result: r.schema_enriched ?? r.result ?? null,
+      pipeline_log: (r.pipeline_log || []).map((e: any) =>
+        typeof e === "string" ? e : e.message || e.step,
+      ),
+    }));
+  },
+  listDatabases: async () => {
+    const res = await listDatabases();
+    return (res.databases || []).map(
+      (d: DatabaseInfo) => d.connection_string || d.name,
+    );
+  },
+  getSchema,
+  getSchemaOverview,
+  getTable,
+  sendChatMessage: (params: { question: string; db_path: string }) =>
+    sendChatMessage(params.question, "", []),
+  getExportUrl,
+  healthCheck,
+};
+
+// ── Types ──
+export interface PipelineRunResult {
+  run_id: string;
+  status: string;
+  created_at: string;
+  schema_enriched: Record<string, TableSchema> | null;
+  pipeline_log: PipelineLogEntry[];
+  errors: string[];
+}
+
+// Alias with `result` convenience field for pages
+export interface PipelineRun {
+  run_id: string;
+  status: string;
+  created_at: string;
+  result: Record<string, any> | null;
+  pipeline_log: string[];
+}
+
+export interface PipelineRunListItem {
+  run_id: string;
+  status: string;
+  created_at: string;
+}
+
+export interface DatabaseInfo {
+  id: string;
+  name: string;
+  connection_string: string;
+  tables: number;
+}
+
+export interface SchemaResult {
+  run_id: string;
+  status: string;
+  schema: Record<string, TableSchema> | null;
+  pipeline_log: PipelineLogEntry[];
+}
+
+export interface OverviewResult {
+  overview: string;
+  total_tables: number;
+  total_columns: number;
+  total_rows: number;
+  avg_health: number;
+  pii_count: number;
+  fk_count: number;
+}
+
+export interface TableSchema {
+  table_name: string;
+  row_count: number;
+  columns: Record<string, ColumnMetadata>;
+  health_score: number;
+  foreign_keys: ForeignKey[];
+  description: string | null;
+}
+
+export interface ColumnMetadata {
+  name: string;
+  original_type: string;
+  description: string | null;
+  business_logic: string | null;
+  potential_pii: boolean;
+  tags: string[];
+  stats: ColumnStats | null;
+}
+
+export interface ColumnStats {
+  null_count: number;
+  null_percentage: number;
+  unique_count: number;
+  unique_percentage: number;
+  sample_values: string[];
+  min_value: number | null;
+  max_value: number | null;
+  mean_value: number | null;
+}
+
+export interface ForeignKey {
+  column: string;
+  referred_table: string;
+  referred_column: string;
+}
+
+export interface PipelineLogEntry {
+  step: string;
+  status: string;
+  message: string;
+  icon: string;
+  errors: string[];
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ChatResponseData {
+  response: string;
+  sql_query: string | null;
+}
