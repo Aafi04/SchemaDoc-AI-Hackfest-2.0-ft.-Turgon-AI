@@ -1,0 +1,17 @@
+# Core Frameworks
+langgraph>=0.0.10
+langchain-google-genai
+langchain-core
+
+# Data & Database
+sqlalchemy>=2.0.0
+pandas
+sqlglot
+
+# Utilities
+python-dotenv
+pydantic>=2.0.0
+
+# UI (Reserved for later)
+streamlit
+streamlit-agraph
