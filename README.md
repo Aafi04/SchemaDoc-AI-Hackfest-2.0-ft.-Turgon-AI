@@ -51,10 +51,10 @@ The system uses a **cyclic LangGraph state machine** with a deterministic valida
 | --------------------- | -------------------------------------------------------------- | ---------------------------------- |
 | **Data Ingestion**    | Dialect-agnostic schema extraction + statistical profiling     | SQLAlchemy 2.0, ThreadPoolExecutor |
 | **Orchestration**     | Cyclic state machine with conditional retry edges              | LangGraph StateGraph               |
-| **Enrichment Engine** | Semantic analysis with forensic log evidence via ReAct agents  | Gemini 2.5 Flash + LangChain      |
+| **Enrichment Engine** | Semantic analysis with forensic log evidence via ReAct agents  | Gemini 2.5 Flash + LangChain       |
 | **Validation Gate**   | Anti-hallucination guard — column-level integrity verification | Deterministic Python               |
 | **Backend API**       | REST API serving pipeline, chat, export, and schema endpoints  | FastAPI + Uvicorn                  |
-| **Frontend**          | Interactive dashboard with 7 pages                             | Next.js 15 + TailwindCSS          |
+| **Frontend**          | Interactive dashboard with 7 pages                             | Next.js 15 + TailwindCSS           |
 | **Cloud Database**    | 3 real-world PostgreSQL databases (575k+ rows)                 | Neon PostgreSQL (serverless)       |
 
 ---
@@ -65,9 +65,9 @@ The system uses a **cyclic LangGraph state machine** with a deterministic valida
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | **Landing Page**     | Animated hero with feature showcase, tech stack badges, and team info                                                                 |
 | **Dashboard**        | Run pipelines against cloud databases, animated pipeline visualizer with real-time stage tracking, retry visualization                |
-| **Schema Explorer**  | Full table browser with per-column stats, tags (PK/FK/PII/UNIQUE), AI descriptions, sample values, null/unique percentages           |
+| **Schema Explorer**  | Full table browser with per-column stats, tags (PK/FK/PII/UNIQUE), AI descriptions, sample values, null/unique percentages            |
 | **Knowledge Graph**  | Interactive ER diagram — ReactFlow-powered node graph with foreign key edges and table metadata                                       |
-| **NL → SQL Chat**    | Natural language to SQL interface grounded in enriched schema context, markdown-rendered responses with syntax-highlighted SQL         |
+| **NL → SQL Chat**    | Natural language to SQL interface grounded in enriched schema context, markdown-rendered responses with syntax-highlighted SQL        |
 | **Business Reports** | AI-generated executive overview, domain detection, quality issues, relationship map, per-table documentation, downloadable as MD/JSON |
 | **Settings**         | Connection health status, session management, and reset                                                                               |
 
@@ -75,11 +75,11 @@ The system uses a **cyclic LangGraph state machine** with a deterministic valida
 
 Three real-world databases hosted on Neon PostgreSQL — no local setup required:
 
-| Database                        | Tables | Rows     | Domain                           |
-| ------------------------------- | ------ | -------- | -------------------------------- |
-| **Olist E-Commerce Brazil**     | 8      | 550,000+ | Brazilian marketplace orders     |
-| **Bike Store Sales**            | 9      | 9,000+   | Retail store inventory & orders  |
-| **Chinook Music Store**         | 11     | 15,600+  | Digital music store transactions |
+| Database                    | Tables | Rows     | Domain                           |
+| --------------------------- | ------ | -------- | -------------------------------- |
+| **Olist E-Commerce Brazil** | 8      | 550,000+ | Brazilian marketplace orders     |
+| **Bike Store Sales**        | 9      | 9,000+   | Retail store inventory & orders  |
+| **Chinook Music Store**     | 11     | 15,600+  | Digital music store transactions |
 
 ### Anti-Hallucination Pipeline
 
@@ -236,11 +236,11 @@ python setup_demo.py                   # Small 3-table demo DB
 
 The application is **fully deployed and publicly accessible**:
 
-| Service     | Platform  | URL                                                                                                                         |
-| ----------- | --------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Frontend    | Vercel    | [schema-doc-ai-hackfest-2-0-ft-turgo.vercel.app](https://schema-doc-ai-hackfest-2-0-ft-turgo.vercel.app)                   |
-| Backend API | Railway   | [schemadoc-ai-hackfest-20-ft-turgon-ai-production.up.railway.app](https://schemadoc-ai-hackfest-20-ft-turgon-ai-production.up.railway.app/api/health) |
-| Database    | Neon      | PostgreSQL serverless (3 schemas, 575k+ rows)                                                                               |
+| Service     | Platform | URL                                                                                                                                                   |
+| ----------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend    | Vercel   | [schema-doc-ai-hackfest-2-0-ft-turgo.vercel.app](https://schema-doc-ai-hackfest-2-0-ft-turgo.vercel.app)                                              |
+| Backend API | Railway  | [schemadoc-ai-hackfest-20-ft-turgon-ai-production.up.railway.app](https://schemadoc-ai-hackfest-20-ft-turgon-ai-production.up.railway.app/api/health) |
+| Database    | Neon     | PostgreSQL serverless (3 schemas, 575k+ rows)                                                                                                         |
 
 ### Self-Hosting
 
