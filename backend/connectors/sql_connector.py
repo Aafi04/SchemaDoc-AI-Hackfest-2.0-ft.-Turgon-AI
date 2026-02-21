@@ -5,8 +5,9 @@ Ported from src/backend/connectors/sql_connector.py with updated imports.
 from typing import Dict, Any, List, Optional
 import datetime
 import logging
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from sqlalchemy import create_engine, inspect, MetaData, Table, select, func, text, Column, case, literal
+from sqlalchemy import create_engine, inspect, MetaData, Table, select, func, text, Column, case, literal, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 from backend.core.state import TableSchema, ColumnMetadata, ColumnStats
@@ -15,10 +16,30 @@ logger = logging.getLogger(__name__)
 
 
 class SQLConnector:
-    def __init__(self, connection_string: str):
+    def __init__(self, connection_string: str, pg_schema: str = None):
+        # Auto-detect pg_schema from custom URL query parameter
+        if pg_schema is None and "pg_schema=" in connection_string:
+            parsed = urlparse(connection_string)
+            qs = parse_qs(parsed.query)
+            if "pg_schema" in qs:
+                pg_schema = qs.pop("pg_schema")[0]
+                # Rebuild URL without pg_schema param
+                new_query = urlencode(qs, doseq=True)
+                connection_string = urlunparse(parsed._replace(query=new_query))
+
+        self.pg_schema = pg_schema
         self.engine = create_engine(connection_string)
+
+        # Set search_path after every new connection (works with Neon pooler)
+        if pg_schema and "postgresql" in connection_string:
+            @event.listens_for(self.engine, "connect")
+            def set_search_path(dbapi_conn, connection_record):
+                cursor = dbapi_conn.cursor()
+                cursor.execute(f"SET search_path TO {pg_schema}")
+                cursor.close()
+
         self.inspector = inspect(self.engine)
-        self.metadata = MetaData()
+        self.metadata = MetaData(schema=pg_schema if pg_schema else None)
 
     # SQLite internal tables that should never be documented
     _SYSTEM_TABLES = {
@@ -32,7 +53,7 @@ class SQLConnector:
         Returns the 'schema_raw' state object.
         """
         schema_out: Dict[str, TableSchema] = {}
-        all_tables = self.inspector.get_table_names()
+        all_tables = self.inspector.get_table_names(schema=self.pg_schema)
         # Filter out database-engine internal / system tables
         table_names = [
             t for t in all_tables if t.lower() not in self._SYSTEM_TABLES
@@ -43,7 +64,7 @@ class SQLConnector:
         def _process_table(t_name: str) -> tuple[str, dict]:
             """Process one table (structure + profiling).  Thread-safe."""
             # Each thread gets its own MetaData to avoid shared-state issues
-            local_meta = MetaData()
+            local_meta = MetaData(schema=self.pg_schema if self.pg_schema else None)
             table_obj = Table(t_name, local_meta, autoload_with=self.engine)
             columns_meta, fk_list = self._extract_structure(t_name, table_obj)
             row_count, health_score, col_stats = self._profile_data(table_obj, columns_meta)
@@ -78,15 +99,15 @@ class SQLConnector:
         """Extracts names, types, constraints, and Foreign Keys."""
         cols_out = {}
 
-        columns = self.inspector.get_columns(table_name)
-        pk_constraint = self.inspector.get_pk_constraint(table_name)
+        columns = self.inspector.get_columns(table_name, schema=self.pg_schema)
+        pk_constraint = self.inspector.get_pk_constraint(table_name, schema=self.pg_schema)
         pk_cols = pk_constraint.get("constrained_columns", [])
-        fks = self.inspector.get_foreign_keys(table_name)
+        fks = self.inspector.get_foreign_keys(table_name, schema=self.pg_schema)
 
         # Extract unique constraints
         unique_cols: set = set()
         try:
-            for uc in self.inspector.get_unique_constraints(table_name):
+            for uc in self.inspector.get_unique_constraints(table_name, schema=self.pg_schema):
                 for col_name in uc.get("column_names", []):
                     unique_cols.add(col_name)
         except Exception:

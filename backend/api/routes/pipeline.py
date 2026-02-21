@@ -52,24 +52,17 @@ async def list_available_databases():
         base = neon_url.split("?")[0]
         params = "sslmode=require"
 
-        databases.append({
-            "id": "olist",
-            "name": "Olist E-Commerce Brazil (8 Tables) [PostgreSQL]",
-            "connection_string": f"{base}?{params}&options=-csearch_path%3Dolist",
-            "tables": 8,
-        })
-        databases.append({
-            "id": "bikestore",
-            "name": "Bike Store Sales (9 Tables) [PostgreSQL]",
-            "connection_string": f"{base}?{params}&options=-csearch_path%3Dbikestore",
-            "tables": 9,
-        })
-        databases.append({
-            "id": "chinook",
-            "name": "Chinook Music Store (11 Tables) [PostgreSQL]",
-            "connection_string": f"{base}?{params}&options=-csearch_path%3Dchinook",
-            "tables": 11,
-        })
+        for db_id, name, schema, tables in [
+            ("olist", "Olist E-Commerce Brazil (8 Tables) [PostgreSQL]", "olist", 8),
+            ("bikestore", "Bike Store Sales (9 Tables) [PostgreSQL]", "bikestore", 9),
+            ("chinook", "Chinook Music Store (11 Tables) [PostgreSQL]", "chinook", 11),
+        ]:
+            databases.append({
+                "id": db_id,
+                "name": name,
+                "connection_string": f"{base}?{params}&pg_schema={schema}",
+                "tables": tables,
+            })
 
     # ── Local SQLite fallback (for development) ──
     data_dir = settings.DATA_DIR
