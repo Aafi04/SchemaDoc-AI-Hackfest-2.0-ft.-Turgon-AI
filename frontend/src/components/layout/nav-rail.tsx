@@ -9,7 +9,6 @@ import {
   TableProperties,
   GitFork,
   MessageSquare,
-  Settings,
   Database,
   FileText,
   RotateCcw,
@@ -23,7 +22,6 @@ const navItems = [
   { href: "/dashboard/graph", label: "Graph", icon: GitFork },
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
   { href: "/dashboard/reports", label: "Reports", icon: FileText },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
 export function NavRail() {

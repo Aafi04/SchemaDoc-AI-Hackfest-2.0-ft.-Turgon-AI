@@ -28,7 +28,7 @@ class AppConfig:
     if _raw_key is not None:
         _raw_key = _raw_key.strip().strip('"').strip("'")
     GEMINI_API_KEY = _raw_key
-    GEMINI_MODEL = "gemini-2.5-flash" # TPM kthm ho jaye to change this to some other model, 1.5 nhi hai apne paas use lite or 3.0 smthing
+    GEMINI_MODEL = "gemini-2.5-flash-lite" # TPM kthm ho jaye to change this to some other model, 1.5 nhi hai apne paas use lite or 3.0 smthing
     
     MAX_RETRIES = 3 # FOR LATER123
 
