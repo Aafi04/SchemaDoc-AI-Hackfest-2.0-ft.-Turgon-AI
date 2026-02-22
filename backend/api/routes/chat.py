@@ -19,11 +19,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["Chat"])
 
 
+def _sid(request: Request) -> str:
+    return request.headers.get("x-session-id", "")
+
+
 @router.post("", response_model=ChatResponse)
 @limiter.limit(CHAT_LIMIT)
 async def chat(request: Request, body: ChatRequest):
     """Send a natural language question, get schema-grounded AI response."""
-    run = get_run(body.run_id)
+    run = get_run(body.run_id, session_id=_sid(request))
     if not run:
         raise HTTPException(status_code=404, detail=f"Run '{body.run_id}' not found")
 

@@ -18,11 +18,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/schema", tags=["Schema"])
 
 
+def _sid(request: Request) -> str:
+    return request.headers.get("x-session-id", "")
+
+
 @router.get("/{run_id}")
 @limiter.limit(READ_LIMIT)
 async def get_schema(request: Request, run_id: str):
     """Get the full enriched schema for a pipeline run."""
-    run = get_run(run_id)
+    run = get_run(run_id, session_id=_sid(request))
     if not run:
         raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
     return {
@@ -37,7 +41,7 @@ async def get_schema(request: Request, run_id: str):
 @limiter.limit(READ_LIMIT)
 async def get_table(request: Request, run_id: str, table_name: str):
     """Get a specific table's schema data."""
-    run = get_run(run_id)
+    run = get_run(run_id, session_id=_sid(request))
     if not run:
         raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
     schema = run.get("schema_enriched", {})
@@ -52,7 +56,7 @@ async def get_table(request: Request, run_id: str, table_name: str):
 @limiter.limit(SCHEMA_OVERVIEW_LIMIT)
 async def get_overview(request: Request, run_id: str):
     """Generate an AI database overview for a pipeline run."""
-    run = get_run(run_id)
+    run = get_run(run_id, session_id=_sid(request))
     if not run:
         raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
 

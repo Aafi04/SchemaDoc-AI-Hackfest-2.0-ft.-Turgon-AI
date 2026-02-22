@@ -20,8 +20,24 @@ from backend.core.rate_limiter import limiter, EXPORT_REPORT_LIMIT, READ_LIMIT
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/export", tags=["Export"])
 
+
+def _sid(request: Request) -> str:
+    return request.headers.get("x-session-id", "")
+
+
 # In-memory cache for generated business reports (avoids re-calling Gemini)
+# Keyed by "{session_id}:{run_id}" for session isolation
 _report_cache: dict[str, dict] = {}
+
+
+def clear_session_reports(session_id: str = ""):
+    """Remove cached reports for a session. If empty, clear all."""
+    if not session_id:
+        _report_cache.clear()
+        return
+    keys_to_remove = [k for k in _report_cache if k.startswith(f"{session_id}:")]
+    for k in keys_to_remove:
+        del _report_cache[k]
 
 
 def _get_null_pct(stats, row_count=0):
@@ -106,7 +122,7 @@ def generate_markdown(schema_data: dict) -> str:
 @limiter.limit(READ_LIMIT)
 async def export_json(request: Request, run_id: str):
     """Export enriched schema as JSON."""
-    run = get_run(run_id)
+    run = get_run(run_id, session_id=_sid(request))
     if not run:
         raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
     schema = run.get("schema_enriched")
@@ -125,7 +141,7 @@ async def export_json(request: Request, run_id: str):
 @limiter.limit(READ_LIMIT)
 async def export_markdown(request: Request, run_id: str):
     """Export enriched schema as Markdown data dictionary."""
-    run = get_run(run_id)
+    run = get_run(run_id, session_id=_sid(request))
     if not run:
         raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
     schema = run.get("schema_enriched")
@@ -472,7 +488,8 @@ def report_to_markdown(report: dict) -> str:
 @limiter.limit(EXPORT_REPORT_LIMIT)
 async def export_report_json(request: Request, run_id: str):
     """Generate and return AI-enhanced business report as JSON."""
-    run = get_run(run_id)
+    sid = _sid(request)
+    run = get_run(run_id, session_id=sid)
     if not run:
         raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
     schema = run.get("schema_enriched")
@@ -480,12 +497,13 @@ async def export_report_json(request: Request, run_id: str):
         raise HTTPException(status_code=400, detail="No schema data available")
 
     # Serve from cache if available
-    if run_id in _report_cache:
-        return JSONResponse(content=_report_cache[run_id])
+    cache_key = f"{sid}:{run_id}"
+    if cache_key in _report_cache:
+        return JSONResponse(content=_report_cache[cache_key])
 
     report = generate_business_report(schema, run_id)
     clean = json.loads(json.dumps(report, cls=DecimalEncoder))
-    _report_cache[run_id] = clean
+    _report_cache[cache_key] = clean
     return JSONResponse(content=clean)
 
 
@@ -493,7 +511,8 @@ async def export_report_json(request: Request, run_id: str):
 @limiter.limit(EXPORT_REPORT_LIMIT)
 async def export_report_markdown(request: Request, run_id: str):
     """Generate and return AI-enhanced business report as Markdown."""
-    run = get_run(run_id)
+    sid = _sid(request)
+    run = get_run(run_id, session_id=sid)
     if not run:
         raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
     schema = run.get("schema_enriched")
@@ -501,11 +520,12 @@ async def export_report_markdown(request: Request, run_id: str):
         raise HTTPException(status_code=400, detail="No schema data available")
 
     # Reuse cached report if available
-    if run_id in _report_cache:
-        report = _report_cache[run_id]
+    cache_key = f"{sid}:{run_id}"
+    if cache_key in _report_cache:
+        report = _report_cache[cache_key]
     else:
         report = generate_business_report(schema, run_id)
-        _report_cache[run_id] = json.loads(json.dumps(report, cls=DecimalEncoder))
+        _report_cache[cache_key] = json.loads(json.dumps(report, cls=DecimalEncoder))
 
     md_content = report_to_markdown(report)
     return Response(

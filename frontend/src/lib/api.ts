@@ -1,5 +1,20 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
+/**
+ * Return a stable browser session ID (persisted in localStorage).
+ * Each browser tab/device gets its own ID so users never see each other's data.
+ */
+function getSessionId(): string {
+  if (typeof window === "undefined") return "";
+  const KEY = "schemadoc_session_id";
+  let id = localStorage.getItem(KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(KEY, id);
+  }
+  return id;
+}
+
 async function fetchAPI<T>(
   endpoint: string,
   options?: RequestInit,
@@ -7,6 +22,7 @@ async function fetchAPI<T>(
   const res = await fetch(`${API_URL}${endpoint}`, {
     headers: {
       "Content-Type": "application/json",
+      "X-Session-ID": getSessionId(),
       ...options?.headers,
     },
     ...options,
@@ -147,7 +163,10 @@ export const api = {
   getReportJsonUrl,
   healthCheck,
   resetSession: async () => {
-    const res = await fetch(`${API_URL}/api/reset`, { method: "POST" });
+    const res = await fetch(`${API_URL}/api/reset`, {
+      method: "POST",
+      headers: { "X-Session-ID": getSessionId() },
+    });
     if (!res.ok) throw new Error("Reset failed");
     return res.json();
   },

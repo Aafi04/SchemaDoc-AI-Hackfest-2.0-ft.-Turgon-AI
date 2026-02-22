@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/pipeline", tags=["Pipeline"])
 
 
+def _sid(request: Request) -> str:
+    """Extract session ID from request header."""
+    return request.headers.get("x-session-id", "")
+
+
 @router.post("/run")
 @limiter.limit(PIPELINE_RUN_LIMIT)
 async def run_pipeline(request: Request, body: PipelineRunRequest):
@@ -25,7 +30,7 @@ async def run_pipeline(request: Request, body: PipelineRunRequest):
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    result = execute_pipeline(body.connection_string)
+    result = execute_pipeline(body.connection_string, session_id=_sid(request))
 
     # Surface pipeline-level failures as structured errors
     if result.get("status") == "failed":
@@ -40,15 +45,15 @@ async def run_pipeline(request: Request, body: PipelineRunRequest):
 @router.get("/runs")
 @limiter.limit(READ_LIMIT)
 async def get_all_runs(request: Request):
-    """List all pipeline runs."""
-    return list_runs()
+    """List all pipeline runs for the caller's session."""
+    return list_runs(session_id=_sid(request))
 
 
 @router.get("/run/{run_id}")
 @limiter.limit(READ_LIMIT)
 async def get_pipeline_run(request: Request, run_id: str):
     """Get results of a specific pipeline run."""
-    run = get_run(run_id)
+    run = get_run(run_id, session_id=_sid(request))
     if not run:
         raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
     return run

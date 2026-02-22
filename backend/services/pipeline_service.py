@@ -1,6 +1,7 @@
 """
 Pipeline orchestration service.
 Manages pipeline runs, caches results, tracks execution.
+Runs are scoped by session_id so each browser session is isolated.
 """
 import uuid
 import json
@@ -14,20 +15,40 @@ from backend.core.utils import DecimalEncoder
 logger = logging.getLogger(__name__)
 
 
-# In-memory store for pipeline runs (replace with DB in production)
-_pipeline_runs: Dict[str, Dict[str, Any]] = {}
+# In-memory store: session_id -> { run_id -> run_data }
+_pipeline_runs: Dict[str, Dict[str, Dict[str, Any]]] = {}
 
 
-def clear_all_runs():
-    """Wipe every pipeline run from memory."""
-    _pipeline_runs.clear()
+def _session_store(session_id: str) -> Dict[str, Dict[str, Any]]:
+    """Return (and lazily create) the run store for a session."""
+    if session_id not in _pipeline_runs:
+        _pipeline_runs[session_id] = {}
+    return _pipeline_runs[session_id]
 
 
-def get_run(run_id: str) -> Optional[Dict[str, Any]]:
-    return _pipeline_runs.get(run_id)
+def clear_all_runs(session_id: str = ""):
+    """Wipe pipeline runs. If session_id given, only that session; else everything."""
+    if session_id:
+        _pipeline_runs.pop(session_id, None)
+    else:
+        _pipeline_runs.clear()
 
 
-def list_runs() -> list:
+def get_run(run_id: str, session_id: str = "") -> Optional[Dict[str, Any]]:
+    """Look up a run. Searches the given session first, then falls back to all sessions."""
+    if session_id:
+        store = _session_store(session_id)
+        if run_id in store:
+            return store[run_id]
+    # Fallback: search all sessions (so run_id-based URLs still work)
+    for store in _pipeline_runs.values():
+        if run_id in store:
+            return store[run_id]
+    return None
+
+
+def list_runs(session_id: str = "") -> list:
+    store = _session_store(session_id) if session_id else {}
     return [
         {
             "run_id": k,
@@ -37,16 +58,17 @@ def list_runs() -> list:
             "pipeline_log": v.get("pipeline_log", []),
             "errors": v.get("errors", []),
         }
-        for k, v in sorted(_pipeline_runs.items(), key=lambda x: x[1]["created_at"], reverse=True)
+        for k, v in sorted(store.items(), key=lambda x: x[1]["created_at"], reverse=True)
     ]
 
 
-def execute_pipeline(connection_string: str) -> Dict[str, Any]:
+def execute_pipeline(connection_string: str, session_id: str = "") -> Dict[str, Any]:
     """
     Execute the LangGraph pipeline synchronously and return results.
     Tracks execution steps for the pipeline integrity log.
     """
     run_id = str(uuid.uuid4())[:8]
+    store = _session_store(session_id)
 
     run_record = {
         "run_id": run_id,
@@ -57,7 +79,7 @@ def execute_pipeline(connection_string: str) -> Dict[str, Any]:
         "pipeline_log": [],
         "errors": [],
     }
-    _pipeline_runs[run_id] = run_record
+    store[run_id] = run_record
 
     try:
         initial_state = {
@@ -140,5 +162,5 @@ def execute_pipeline(connection_string: str) -> Dict[str, Any]:
         run_record["status"] = "failed"
         run_record["errors"] = [str(e)]
 
-    _pipeline_runs[run_id] = run_record
+    store[run_id] = run_record
     return run_record

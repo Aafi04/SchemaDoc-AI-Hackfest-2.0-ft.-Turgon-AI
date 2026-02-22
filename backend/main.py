@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -72,19 +72,20 @@ app.include_router(export.router)
 
 # ── Reset Session ──
 @app.post("/api/reset")
-async def reset_session():
-    """Clear all in-memory pipeline runs, report caches, and schema cache."""
+async def reset_session(request: Request):
+    """Clear pipeline runs and report caches for the caller's session."""
     from backend.services.pipeline_service import clear_all_runs
-    from backend.api.routes.export import _report_cache
+    from backend.api.routes.export import clear_session_reports
 
-    clear_all_runs()
-    _report_cache.clear()
+    sid = request.headers.get("x-session-id", "")
+    clear_all_runs(session_id=sid)
+    clear_session_reports(session_id=sid)
 
     cache_file = settings.DATA_DIR / "schema_cache.json"
     if cache_file.exists():
         cache_file.unlink()
 
-    logger.info("Session reset — all runs, caches, and artifacts cleared.")
+    logger.info(f"Session reset — session '{sid or 'global'}' cleared.")
     return {"status": "ok", "message": "Session reset successfully"}
 
 
