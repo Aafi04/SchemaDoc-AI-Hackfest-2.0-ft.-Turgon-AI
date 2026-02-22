@@ -27,9 +27,30 @@ class SQLConnector:
                 new_query = urlencode(qs, doseq=True)
                 connection_string = urlunparse(parsed._replace(query=new_query))
 
-        self.pg_schema = pg_schema
         self.is_snowflake = "snowflake" in connection_string.lower()
-        self.engine = create_engine(connection_string)
+
+        # For Snowflake, extract schema from the URL path: /DATABASE/SCHEMA
+        if self.is_snowflake and pg_schema is None:
+            parsed = urlparse(connection_string)
+            path_parts = [p for p in parsed.path.strip("/").split("/") if p]
+            if len(path_parts) >= 2:
+                pg_schema = path_parts[1]  # second segment = schema
+                logger.info(f"Snowflake: detected schema '{pg_schema}' from URL path")
+            else:
+                pg_schema = "PUBLIC"
+                logger.info("Snowflake: no schema in URL, defaulting to PUBLIC")
+
+        self.pg_schema = pg_schema
+        # Snowflake needs a bigger pool for concurrent table processing
+        if self.is_snowflake:
+            self.engine = create_engine(
+                connection_string,
+                pool_size=10,
+                max_overflow=5,
+                pool_pre_ping=True,
+            )
+        else:
+            self.engine = create_engine(connection_string)
 
         # Set search_path after every new connection (works with Neon pooler)
         if pg_schema and "postgresql" in connection_string:
@@ -64,11 +85,7 @@ class SQLConnector:
         Returns the 'schema_raw' state object.
         """
         schema_out: Dict[str, TableSchema] = {}
-        sf_schema = self.pg_schema
-        # For Snowflake, default to PUBLIC schema if none specified
-        if self.is_snowflake and not sf_schema:
-            sf_schema = "PUBLIC"
-        all_tables = self.inspector.get_table_names(schema=sf_schema or self.pg_schema)
+        all_tables = self.inspector.get_table_names(schema=self.pg_schema)
         # Filter out database-engine internal / system tables
         table_names = [
             t for t in all_tables if t.lower() not in self._SYSTEM_TABLES
@@ -96,7 +113,9 @@ class SQLConnector:
             }
 
         # Process tables in parallel (I/O-bound SQL queries benefit from threads)
-        with ThreadPoolExecutor(max_workers=min(len(table_names), 8)) as pool:
+        # Snowflake needs lower concurrency to avoid connection exhaustion
+        max_w = min(len(table_names), 4) if self.is_snowflake else min(len(table_names), 8)
+        with ThreadPoolExecutor(max_workers=max_w) as pool:
             futures = {pool.submit(_process_table, t): t for t in table_names}
             for future in as_completed(futures):
                 t_name = futures[future]
