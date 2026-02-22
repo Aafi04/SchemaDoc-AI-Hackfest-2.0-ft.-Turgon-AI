@@ -11,6 +11,7 @@ langchain-core
 # ── Database ──
 sqlalchemy>=2.0.0
 pandas
+snowflake-sqlalchemy  # Snowflake support
 
 # ── Configuration ──
 python-dotenv

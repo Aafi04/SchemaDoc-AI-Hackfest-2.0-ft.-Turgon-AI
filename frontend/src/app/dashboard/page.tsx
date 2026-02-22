@@ -127,7 +127,7 @@ function PipelineRunner() {
             type="text"
             value={customConn}
             onChange={(e) => setCustomConn(e.target.value)}
-            placeholder="postgresql://user:pass@host:5432/db"
+            placeholder="snowflake://user:pass@account/db/schema?warehouse=WH"
             className="w-72 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs font-mono text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-blue-500"
           />
           <button

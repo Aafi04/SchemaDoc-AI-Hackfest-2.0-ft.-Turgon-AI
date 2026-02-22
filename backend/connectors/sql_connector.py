@@ -28,6 +28,7 @@ class SQLConnector:
                 connection_string = urlunparse(parsed._replace(query=new_query))
 
         self.pg_schema = pg_schema
+        self.is_snowflake = "snowflake" in connection_string.lower()
         self.engine = create_engine(connection_string)
 
         # Set search_path after every new connection (works with Neon pooler)
@@ -41,10 +42,20 @@ class SQLConnector:
         self.inspector = inspect(self.engine)
         self.metadata = MetaData(schema=pg_schema if pg_schema else None)
 
-    # SQLite internal tables that should never be documented
+    # Internal / system tables that should never be documented
     _SYSTEM_TABLES = {
+        # SQLite
         "sqlite_sequence", "sqlite_stat1", "sqlite_stat2",
         "sqlite_stat3", "sqlite_stat4", "sqlite_master",
+        # Snowflake (INFORMATION_SCHEMA views that may appear)
+        "columns", "databases", "enabled_roles", "external_tables",
+        "file_formats", "functions", "information_schema_catalog_name",
+        "load_history", "object_privileges", "packages",
+        "pipes", "procedures", "referential_constraints",
+        "replication_databases", "schemata", "sequences",
+        "stages", "table_constraints", "table_privileges",
+        "table_storage_metrics", "tables", "usage_privileges",
+        "views",
     }
 
     def get_live_schema(self) -> Dict[str, TableSchema]:
@@ -53,7 +64,11 @@ class SQLConnector:
         Returns the 'schema_raw' state object.
         """
         schema_out: Dict[str, TableSchema] = {}
-        all_tables = self.inspector.get_table_names(schema=self.pg_schema)
+        sf_schema = self.pg_schema
+        # For Snowflake, default to PUBLIC schema if none specified
+        if self.is_snowflake and not sf_schema:
+            sf_schema = "PUBLIC"
+        all_tables = self.inspector.get_table_names(schema=sf_schema or self.pg_schema)
         # Filter out database-engine internal / system tables
         table_names = [
             t for t in all_tables if t.lower() not in self._SYSTEM_TABLES
@@ -193,7 +208,9 @@ class SQLConnector:
                     type_str = meta["original_type"].upper()
                     is_numeric = any(
                         t in type_str
-                        for t in ["INT", "FLOAT", "DECIMAL", "NUMERIC", "REAL"]
+                        for t in ["INT", "FLOAT", "DECIMAL", "NUMERIC", "REAL",
+                                  "NUMBER", "DOUBLE", "BIGINT", "SMALLINT",
+                                  "TINYINT", "BYTEINT"]
                     )
                     numeric_flags.append(is_numeric)
                     if is_numeric:
