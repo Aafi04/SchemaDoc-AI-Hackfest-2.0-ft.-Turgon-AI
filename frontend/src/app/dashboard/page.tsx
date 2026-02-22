@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { PipelineRun } from "@/lib/api";
 import {
@@ -88,6 +89,9 @@ function PipelineRunner() {
     mutationFn: api.runPipeline,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["runs"] });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Pipeline run failed. Please try again.");
     },
   });
 

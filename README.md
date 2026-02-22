@@ -288,12 +288,12 @@ pytest backend/tests/test_e2e.py -v
 
 **21 tests** across 4 categories:
 
-| Category | Tests | Covers |
-|---|---|---|
-| Happy Path | 6 | Health check, root, databases, runs, reset, docs |
-| Edge Cases | 11 | Invalid inputs, missing runs, empty messages, all 404 paths |
-| Rate Limiting | 2 | 429 trigger + structured response body |
-| Error Structure | 2 | Consistent JSON error format for 404 & 422 |
+| Category        | Tests | Covers                                                      |
+| --------------- | ----- | ----------------------------------------------------------- |
+| Happy Path      | 6     | Health check, root, databases, runs, reset, docs            |
+| Edge Cases      | 11    | Invalid inputs, missing runs, empty messages, all 404 paths |
+| Rate Limiting   | 2     | 429 trigger + structured response body                      |
+| Error Structure | 2     | Consistent JSON error format for 404 & 422                  |
 
 ---
 

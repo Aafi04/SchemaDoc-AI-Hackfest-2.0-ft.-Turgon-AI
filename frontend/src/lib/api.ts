@@ -14,6 +14,14 @@ async function fetchAPI<T>(
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }));
+
+    // Friendly message for rate-limited requests (429)
+    if (res.status === 429) {
+      throw new Error(
+        "You're sending requests too quickly. Please wait a moment and try again.",
+      );
+    }
+
     throw new Error(error.detail || `API error: ${res.status}`);
   }
 
