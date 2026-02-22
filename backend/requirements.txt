@@ -21,3 +21,6 @@ pydantic-settings
 pytest
 pytest-asyncio
 httpx
+
+# ── Rate Limiting ──
+slowapi

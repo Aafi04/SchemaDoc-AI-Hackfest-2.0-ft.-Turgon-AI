@@ -20,6 +20,11 @@ export const metadata: Metadata = {
   title: "SchemaDoc AI",
   description: "AI-Powered Data Dictionary Generator — Production Dashboard",
   icons: { icon: "/favicon.ico" },
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    viewportFit: "cover", // iOS safe-area support
+  },
 };
 
 export default function RootLayout({

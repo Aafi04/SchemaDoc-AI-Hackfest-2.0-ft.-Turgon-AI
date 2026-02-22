@@ -6,26 +6,21 @@ GET /api/schema/{run_id}/table/{table_name} — Get specific table
 """
 import json
 import logging
-from decimal import Decimal
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage
 from backend.services.pipeline_service import get_run
 from backend.core.config import settings
+from backend.core.utils import DecimalEncoder
+from backend.core.rate_limiter import limiter, SCHEMA_OVERVIEW_LIMIT, READ_LIMIT
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/schema", tags=["Schema"])
 
 
-class DecimalEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, Decimal):
-            return float(obj)
-        return super().default(obj)
-
-
 @router.get("/{run_id}")
-async def get_schema(run_id: str):
+@limiter.limit(READ_LIMIT)
+async def get_schema(request: Request, run_id: str):
     """Get the full enriched schema for a pipeline run."""
     run = get_run(run_id)
     if not run:
@@ -39,7 +34,8 @@ async def get_schema(run_id: str):
 
 
 @router.get("/{run_id}/table/{table_name}")
-async def get_table(run_id: str, table_name: str):
+@limiter.limit(READ_LIMIT)
+async def get_table(request: Request, run_id: str, table_name: str):
     """Get a specific table's schema data."""
     run = get_run(run_id)
     if not run:
@@ -53,7 +49,8 @@ async def get_table(run_id: str, table_name: str):
 
 
 @router.get("/{run_id}/overview")
-async def get_overview(run_id: str):
+@limiter.limit(SCHEMA_OVERVIEW_LIMIT)
+async def get_overview(request: Request, run_id: str):
     """Generate an AI database overview for a pipeline run."""
     run = get_run(run_id)
     if not run:

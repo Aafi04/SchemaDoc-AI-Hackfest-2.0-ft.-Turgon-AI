@@ -18,15 +18,9 @@ from langchain_core.tools import tool
 from backend.core.state import AgentState
 from backend.core.config import AppConfig
 from backend.services.usage_search import usage_search
+from backend.core.utils import DecimalEncoder
 
 logger = logging.getLogger(__name__)
-
-
-class DecimalEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, Decimal):
-            return float(obj)
-        return super(DecimalEncoder, self).default(obj)
 
 
 @tool

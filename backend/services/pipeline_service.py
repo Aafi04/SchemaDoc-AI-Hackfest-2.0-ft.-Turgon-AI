@@ -6,19 +6,12 @@ import uuid
 import json
 import logging
 from datetime import datetime, timezone
-from decimal import Decimal
 from typing import Dict, Any, Optional
 from backend.pipeline.graph import build_pipeline
 from backend.core.config import settings
+from backend.core.utils import DecimalEncoder
 
 logger = logging.getLogger(__name__)
-
-
-class DecimalEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, Decimal):
-            return float(obj)
-        return super().default(obj)
 
 
 # In-memory store for pipeline runs (replace with DB in production)

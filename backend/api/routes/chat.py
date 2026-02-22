@@ -4,32 +4,28 @@ POST /api/chat — Send a message, get AI response
 """
 import json
 import logging
-from decimal import Decimal
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 from shared.schemas import ChatRequest, ChatResponse
 from backend.services.pipeline_service import get_run
 from backend.core.config import settings
+from backend.core.exceptions import DownstreamServiceError
+from backend.core.utils import DecimalEncoder
+from backend.core.rate_limiter import limiter, CHAT_LIMIT
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["Chat"])
 
 
-class DecimalEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, Decimal):
-            return float(obj)
-        return super().default(obj)
-
-
 @router.post("", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+@limiter.limit(CHAT_LIMIT)
+async def chat(request: Request, body: ChatRequest):
     """Send a natural language question, get schema-grounded AI response."""
-    run = get_run(request.run_id)
+    run = get_run(body.run_id)
     if not run:
-        raise HTTPException(status_code=404, detail=f"Run '{request.run_id}' not found")
+        raise HTTPException(status_code=404, detail=f"Run '{body.run_id}' not found")
 
     schema_data = run.get("schema_enriched")
     if not schema_data:
@@ -51,12 +47,12 @@ DIRECTIVES:
 6. Be concise and precise."""
 
         messages = [SystemMessage(content=system_prompt)]
-        for msg in request.history:
+        for msg in body.history:
             if msg.get("role") == "user":
                 messages.append(HumanMessage(content=msg["content"]))
             else:
                 messages.append(AIMessage(content=msg["content"]))
-        messages.append(HumanMessage(content=request.message))
+        messages.append(HumanMessage(content=body.message))
 
         llm = ChatGoogleGenerativeAI(
             model=settings.GEMINI_MODEL,
@@ -81,4 +77,8 @@ DIRECTIVES:
 
     except Exception as e:
         logger.error(f"Chat error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        # Structured downstream error instead of exposing raw exception details
+        raise DownstreamServiceError(
+            service="Gemini AI",
+            message="Failed to generate a response. Please try again shortly.",
+        )

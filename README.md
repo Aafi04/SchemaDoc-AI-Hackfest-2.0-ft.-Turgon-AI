@@ -96,6 +96,13 @@ Three real-world databases hosted on Neon PostgreSQL — no local setup required
 - **Report caching** — business reports generated once per run, served instantly on revisit
 - **Event-based connection pooling** — compatible with Neon's serverless pooler via `SET search_path`
 
+### Production Hardening
+
+- **Centralized Error Handling** — all API errors return consistent `{error, detail, status_code}` JSON via global exception handlers (no raw tracebacks leak to clients)
+- **Rate Limiting** — IP-based sliding-window limits via `slowapi`: pipeline runs (5/min), chat (20/min), AI reports (10/min), reads (60/min). Returns structured 429 responses with `Retry-After` headers
+- **E2E Test Suite** — 21 automated tests across 4 categories (happy-path, edge-cases, rate limiting, error structure) using `pytest` + `httpx` AsyncClient
+- **Cross-Platform UI** — responsive layout with mobile bottom navigation, iOS safe-area support, and adaptive padding
+
 ---
 
 ## Live Demo
@@ -171,7 +178,10 @@ python setup_demo.py                   # Small 3-table demo DB
 │   ├── main.py                     # FastAPI application entry point
 │   ├── core/
 │   │   ├── config.py               # Settings (Pydantic BaseSettings)
-│   │   └── state.py                # TypedDict state definitions
+│   │   ├── state.py                # TypedDict state definitions
+│   │   ├── exceptions.py           # Centralized error handling & custom exceptions
+│   │   ├── rate_limiter.py         # IP-based rate limiting (slowapi)
+│   │   └── utils.py                # Shared utilities (DecimalEncoder, etc.)
 │   ├── api/routes/
 │   │   ├── pipeline.py             # Pipeline execution + database listing
 │   │   ├── schema.py               # Schema overview + table detail
@@ -184,9 +194,11 @@ python setup_demo.py                   # Small 3-table demo DB
 │   │   └── nodes/
 │   │       ├── enrichment_node.py  # Gemini ReAct enrichment
 │   │       └── validation_node.py  # Anti-hallucination gate
-│   └── services/
-│       ├── pipeline_service.py     # Run management + execution
-│       └── usage_search.py         # Forensic log search (ReAct tool)
+│   ├── services/
+│   │   ├── pipeline_service.py     # Run management + execution
+│   │   └── usage_search.py         # Forensic log search (ReAct tool)
+│   └── tests/
+│       └── test_e2e.py             # 21 E2E tests (pytest + httpx)
 ├── frontend/
 │   ├── src/app/
 │   │   ├── page.tsx                # Animated landing page
@@ -199,7 +211,7 @@ python setup_demo.py                   # Small 3-table demo DB
 │   │       └── settings/page.tsx   # Health check + session reset
 │   ├── src/components/
 │   │   ├── PipelineVisualizer.tsx  # Animated pipeline stage component
-│   │   └── layout/                 # NavRail, TopBar, AppShell
+│   │   └── layout/                 # NavRail, TopBar, AppShell, MobileNav
 │   └── src/lib/
 │       ├── api.ts                  # API client + TypeScript types
 │       └── utils.ts                # Utility functions
@@ -222,7 +234,9 @@ python setup_demo.py                   # Small 3-table demo DB
 | Database Introspection | SQLAlchemy 2.0 (dialect-agnostic)       |
 | Cloud Database         | Neon PostgreSQL (serverless pooler)     |
 | Backend API            | FastAPI + Uvicorn                       |
-| Frontend               | Next.js 15, TypeScript, TailwindCSS     |
+| Rate Limiting          | slowapi (IP-based sliding window)       |
+| E2E Testing            | pytest + httpx AsyncClient              |
+| Frontend               | Next.js 16, TypeScript, TailwindCSS     |
 | Animations             | Framer Motion                           |
 | Data Fetching          | TanStack React Query                    |
 | ER Visualization       | ReactFlow                               |
@@ -262,6 +276,24 @@ The application is **fully deployed and publicly accessible**:
 > API keys are set in each platform's dashboard — never committed to Git.
 
 </details>
+
+---
+
+## Running Tests
+
+```bash
+# Activate virtual environment, then:
+pytest backend/tests/test_e2e.py -v
+```
+
+**21 tests** across 4 categories:
+
+| Category | Tests | Covers |
+|---|---|---|
+| Happy Path | 6 | Health check, root, databases, runs, reset, docs |
+| Edge Cases | 11 | Invalid inputs, missing runs, empty messages, all 404 paths |
+| Rate Limiting | 2 | 429 trigger + structured response body |
+| Error Structure | 2 | Consistent JSON error format for 404 & 422 |
 
 ---
 

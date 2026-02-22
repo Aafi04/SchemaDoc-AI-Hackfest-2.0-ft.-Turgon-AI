@@ -7,27 +7,21 @@ GET /api/export/{run_id}/report/markdown — AI-enhanced business report (MD)
 """
 import json
 import logging
-from decimal import Decimal
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response, JSONResponse
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from backend.services.pipeline_service import get_run
 from backend.core.config import settings
+from backend.core.utils import DecimalEncoder
+from backend.core.rate_limiter import limiter, EXPORT_REPORT_LIMIT, READ_LIMIT
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/export", tags=["Export"])
 
 # In-memory cache for generated business reports (avoids re-calling Gemini)
 _report_cache: dict[str, dict] = {}
-
-
-class DecimalEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, Decimal):
-            return float(obj)
-        return super().default(obj)
 
 
 def _get_null_pct(stats, row_count=0):
@@ -109,7 +103,8 @@ def generate_markdown(schema_data: dict) -> str:
 
 
 @router.get("/{run_id}/json")
-async def export_json(run_id: str):
+@limiter.limit(READ_LIMIT)
+async def export_json(request: Request, run_id: str):
     """Export enriched schema as JSON."""
     run = get_run(run_id)
     if not run:
@@ -127,7 +122,8 @@ async def export_json(run_id: str):
 
 
 @router.get("/{run_id}/markdown")
-async def export_markdown(run_id: str):
+@limiter.limit(READ_LIMIT)
+async def export_markdown(request: Request, run_id: str):
     """Export enriched schema as Markdown data dictionary."""
     run = get_run(run_id)
     if not run:
@@ -473,7 +469,8 @@ def report_to_markdown(report: dict) -> str:
 # ── Report API Endpoints ──────────────────────────────────────────
 
 @router.get("/{run_id}/report")
-async def export_report_json(run_id: str):
+@limiter.limit(EXPORT_REPORT_LIMIT)
+async def export_report_json(request: Request, run_id: str):
     """Generate and return AI-enhanced business report as JSON."""
     run = get_run(run_id)
     if not run:
@@ -493,7 +490,8 @@ async def export_report_json(run_id: str):
 
 
 @router.get("/{run_id}/report/markdown")
-async def export_report_markdown(run_id: str):
+@limiter.limit(EXPORT_REPORT_LIMIT)
+async def export_report_markdown(request: Request, run_id: str):
     """Generate and return AI-enhanced business report as Markdown."""
     run = get_run(run_id)
     if not run:

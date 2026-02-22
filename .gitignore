@@ -42,3 +42,9 @@ data/logs/
 
 # ── Misc ──
 *.log
+
+# ── Testing artifacts ──
+.pytest_cache/
+htmlcov/
+.coverage
+nonexistent.db

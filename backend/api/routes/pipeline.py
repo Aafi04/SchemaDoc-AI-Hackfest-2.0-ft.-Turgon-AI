@@ -5,35 +5,48 @@ GET  /api/pipeline/runs — List all runs
 GET  /api/pipeline/run/{run_id} — Get run results
 """
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from shared.schemas import PipelineRunRequest, PipelineRunResponse
 from backend.services.pipeline_service import execute_pipeline, get_run, list_runs
 from backend.core.config import settings
+from backend.core.exceptions import PipelineExecutionError
+from backend.core.rate_limiter import limiter, PIPELINE_RUN_LIMIT, READ_LIMIT
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/pipeline", tags=["Pipeline"])
 
 
 @router.post("/run")
-async def run_pipeline(request: PipelineRunRequest):
+@limiter.limit(PIPELINE_RUN_LIMIT)
+async def run_pipeline(request: Request, body: PipelineRunRequest):
     """Start a new pipeline analysis run."""
     try:
         settings.validate_keys()
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    result = execute_pipeline(request.connection_string)
+    result = execute_pipeline(body.connection_string)
+
+    # Surface pipeline-level failures as structured errors
+    if result.get("status") == "failed":
+        raise PipelineExecutionError(
+            message="Pipeline execution failed.",
+            details={"run_id": result.get("run_id"), "errors": result.get("errors", [])},
+        )
+
     return result
 
 
 @router.get("/runs")
-async def get_all_runs():
+@limiter.limit(READ_LIMIT)
+async def get_all_runs(request: Request):
     """List all pipeline runs."""
     return list_runs()
 
 
 @router.get("/run/{run_id}")
-async def get_pipeline_run(run_id: str):
+@limiter.limit(READ_LIMIT)
+async def get_pipeline_run(request: Request, run_id: str):
     """Get results of a specific pipeline run."""
     run = get_run(run_id)
     if not run:

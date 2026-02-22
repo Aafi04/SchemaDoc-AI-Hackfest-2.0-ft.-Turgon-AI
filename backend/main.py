@@ -13,6 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from backend.core.config import settings
+from backend.core.exceptions import register_exception_handlers
+from backend.core.rate_limiter import setup_rate_limiting
 from backend.api.routes import pipeline, chat, export, schema
 
 # ── Logging ──
@@ -54,6 +56,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Centralized Error Handling ──
+register_exception_handlers(app)
+
+# ── Rate Limiting ──
+setup_rate_limiting(app)
 
 # ── Routes ──
 app.include_router(pipeline.router)
