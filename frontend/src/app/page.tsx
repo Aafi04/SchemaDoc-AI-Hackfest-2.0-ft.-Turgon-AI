@@ -71,8 +71,8 @@ export default function Home() {
         <div className="mt-6 flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-2">
           <Info className="h-3.5 w-3.5 shrink-0 text-amber-400" />
           <span className="text-xs text-amber-300/80">
-            Live API disabled to protect resources &mdash; watch the demo below
-            instead!
+            Live API might be disabled to protect resources &mdash; if yes,
+            watch the demo below instead!
           </span>
         </div>
 
