@@ -86,7 +86,13 @@ export default function Home() {
             <ArrowRight className="h-4 w-4" />
           </Link>
           <button
-            onClick={() => setShowDemo(true)}
+            onClick={() =>
+              window.open(
+                "https://drive.google.com/file/d/1KM8AKxEV_5BFxnViivPDXGUPn1hKWetu/view",
+                "_blank",
+                "noopener,noreferrer",
+              )
+            }
             className="flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-6 py-3 text-sm font-semibold text-zinc-200 transition-all hover:border-zinc-600 hover:bg-zinc-800 hover:shadow-lg active:scale-[0.98]"
           >
             <Play className="h-4 w-4 text-blue-400" />
