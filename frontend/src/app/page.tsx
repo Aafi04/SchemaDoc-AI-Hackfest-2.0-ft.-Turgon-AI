@@ -72,7 +72,7 @@ export default function Home() {
           <Info className="h-3.5 w-3.5 shrink-0 text-amber-400" />
           <span className="text-xs text-amber-300/80">
             Live API might be disabled to protect resources &mdash; if yes,
-            watch the demo below instead!
+            watch the demo below ON PC instead!
           </span>
         </div>
 
